@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial OS — Bares</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#fafaf8; --panel:#ffffff; --ink:#16181a; --muted:#8a8a85;
+  --rule:#e3e1dc; --belt:#b8342b; --money:#1f7a4d; --amber:#a86b1f;
+  --soft:#f1efe9;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Archivo',-apple-system,'Segoe UI',Arial,sans-serif;
+  background:var(--paper); color:var(--ink); font-size:13px;
+  height:100vh; display:flex; flex-direction:column; overflow:hidden;
+}
+button{font-family:inherit;}
+input,select,textarea{
+  font-family:inherit; font-size:13px; color:var(--ink);
+  background:#fff; border:1px solid var(--rule); border-radius:4px;
+  padding:6px 9px; outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--ink);}
+
+/* HEADER */
+header{
+  background:var(--panel); border-bottom:2px solid var(--ink);
+  padding:8px 16px; display:flex; align-items:center; gap:16px; flex-shrink:0;
+}
+.brand{font-weight:800; font-size:14px; letter-spacing:2px; text-transform:uppercase;}
+.brand span{color:var(--belt);}
+.head-stats{display:flex; gap:18px; margin-left:auto; align-items:baseline; flex-wrap:wrap;}
+.hs{display:flex; flex-direction:column;}
+.hs .l{font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--muted);}
+.hs .v{font-weight:700; font-variant-numeric:tabular-nums;}
+.hs .v.red{color:var(--belt);}
+.hs .v.green{color:var(--money);}
+.tools{display:flex; gap:6px;}
+.tool-btn{
+  font-size:10px; padding:4px 9px; background:none;
+  border:1px solid var(--rule); border-radius:4px; color:var(--muted); cursor:pointer;
+}
+.tool-btn:hover{color:var(--ink); border-color:var(--ink);}
+
+/* TABS */
+.tabs{display:flex; background:var(--panel); border-bottom:1px solid var(--rule); padding:0 10px; flex-shrink:0; overflow-x:auto; scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{
+  padding:9px 15px; font-size:12px; font-weight:600; color:var(--muted);
+  cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap;
+}
+.tab:hover{color:var(--ink);}
+.tab.active{color:var(--belt); border-bottom-color:var(--belt);}
+
+/* PAGES */
+.page{display:none; flex:1; overflow-y:auto; padding:14px;}
+.page.active{display:block;}
+.wrap{max-width:1000px; margin:0 auto;}
+
+.card{background:var(--panel); border:1px solid var(--rule); border-radius:6px; margin-bottom:12px; overflow:hidden;}
+.card-h{
+  padding:7px 12px; border-bottom:1px solid var(--rule); background:var(--soft);
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#555;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.card-b{padding:10px 12px;}
+.small-btn{
+  font-size:10px; font-weight:600; padding:3px 10px; border-radius:4px;
+  border:1px solid var(--rule); background:#fff; color:var(--ink); cursor:pointer;
+}
+.small-btn:hover{border-color:var(--ink);}
+.small-btn.primary{background:var(--ink); color:#fff; border-color:var(--ink);}
+.small-btn.green{background:var(--money); color:#fff; border-color:var(--money);}
+
+/* CHECKLIST */
+.chk{display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
+.chk:last-child{border-bottom:none;}
+.chk .box{
+  width:17px; height:17px; border:2px solid var(--rule); border-radius:3px; flex-shrink:0; margin-top:1px;
+  display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:800;
+}
+.chk.done .box{background:var(--money); border-color:var(--money);}
+.chk.done .t{text-decoration:line-through; color:var(--muted);}
+.chk .t{line-height:1.4;}
+.chk .sub{font-size:11px; color:var(--muted);}
+
+/* TABLES */
+table{width:100%; border-collapse:collapse;}
+th{font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#999; text-align:left; padding:4px 8px; border-bottom:1px solid var(--rule); white-space:nowrap;}
+th.r{text-align:right;}
+td{padding:4px 8px; border-bottom:1px solid var(--soft); white-space:nowrap; font-variant-numeric:tabular-nums;}
+td.r{text-align:right;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fcfbf8;}
+.tag{font-size:9px; font-weight:700; padding:1px 6px; border-radius:3px; text-transform:uppercase; letter-spacing:.5px;}
+.tag.citi{background:#e8effa; color:#1d4f9e;}
+.tag.qs{background:#e7f3ec; color:var(--money);}
+.tag.chk-acct{background:#faf3e0; color:var(--amber);}
+.tag.venmo{background:#f1e8fa; color:#6d28d9;}
+.t-auto{color:var(--money); font-weight:600; font-size:11px;}
+.t-manual{color:var(--belt); font-weight:600; font-size:11px;}
+.t-pending{color:var(--amber); font-weight:600; font-size:11px;}
+.link-num{cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;}
+.link-num:hover{color:#1d4f9e;}
+.mcell{width:38px; text-align:right; font-size:10px;}
+.mcell .plus{
+  display:inline-block; width:22px; text-align:center; color:#ccc; border:1px solid var(--soft);
+  border-radius:3px; cursor:pointer; font-weight:700;
+}
+.mcell .plus:hover{color:var(--ink); border-color:var(--rule);}
+.mcell .amt{color:var(--money); cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;}
+.mult{color:#1d4f9e; font-size:8px; font-weight:700;}
+.del{background:none; border:none; color:#ddd; cursor:pointer; font-size:14px; padding:0 3px;}
+.del:hover{color:var(--belt);}
+
+/* FUNDS */
+.fund-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px;}
+.fund{background:var(--panel); border:1px solid var(--rule); border-radius:6px; padding:10px 12px;}
+.fund .name{font-weight:700; font-size:13px; display:flex; justify-content:space-between; align-items:baseline;}
+.fund .nums{font-size:12px; color:var(--muted); margin:3px 0 6px; font-variant-numeric:tabular-nums;}
+.fund .nums b{color:var(--ink);}
+.fund .bar{height:6px; background:var(--soft); border-radius:3px; overflow:hidden;}
+.fund .fill{height:6px; border-radius:3px; background:var(--money); transition:width .3s;}
+.fund.full{border-color:var(--money);}
+.fund.full .name::after{content:'FUNDED'; font-size:8px; color:var(--money); font-weight:800; letter-spacing:1px;}
+.fund .acts{display:flex; gap:5px; margin-top:7px;}
+.fund .note{font-size:10px; color:var(--muted); margin-top:5px;}
+
+/* ALLOCATION ROWS */
+.alloc{display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--soft);}
+.alloc:last-child{border-bottom:none;}
+.alloc .amt{font-weight:700; min-width:64px; text-align:right; font-variant-numeric:tabular-nums;}
+.alloc .what{flex:1;}
+.alloc .what .d{font-size:11px; color:var(--muted);}
+.surplus-box{
+  background:var(--ink); color:#fff; border-radius:6px; padding:12px 14px; margin-top:10px;
+  display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.surplus-box .label{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#aaa;}
+.surplus-box .big{font-size:22px; font-weight:800; font-variant-numeric:tabular-nums;}
+.surplus-box .big.red{color:#ff9c92;}
+.surplus-box .tgt{font-size:12px; color:#ddd;}
+
+/* BUDGET */
+.bud-row{display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--soft);}
+.bud-row:last-child{border-bottom:none;}
+.bud-name{width:150px; font-weight:600;}
+.bud-bar{flex:1; height:8px; background:var(--soft); border-radius:4px; overflow:hidden;}
+.bud-fill{height:8px; border-radius:4px; background:var(--money);}
+.bud-fill.over{background:var(--belt);}
+.bud-nums{width:150px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums;}
+.bud-nums .left{color:var(--muted); font-size:10px;}
+
+/* MODAL */
+.overlay{position:fixed; inset:0; background:rgba(20,20,20,.45); display:none; align-items:center; justify-content:center; z-index:100; padding:16px;}
+.overlay.open{display:flex;}
+.modal{background:#fff; border-radius:8px; padding:16px; width:100%; max-width:340px; box-shadow:0 10px 40px rgba(0,0,0,.2);}
+.modal h3{font-size:14px; margin-bottom:10px;}
+.modal .field{margin-bottom:9px;}
+.modal label{display:block; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:3px;}
+.modal input,.modal select,.modal textarea{width:100%;}
+.modal .row{display:flex; gap:8px; margin-top:12px;}
+.modal .row button{flex:1; padding:7px; border-radius:5px; font-weight:700; cursor:pointer; border:1px solid var(--rule); background:#fff;}
+.modal .row .go{background:var(--ink); color:#fff; border-color:var(--ink);}
+.pay-list{margin-bottom:8px; max-height:140px; overflow-y:auto;}
+.pay-item{display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--soft); font-size:12px;}
+.empty{color:#bbb; font-style:italic; font-size:12px; padding:6px 0;}
+.note-line{font-size:11px; color:var(--muted); margin-top:6px; line-height:1.5;}
+#toast{
+  position:fixed; bottom:16px; right:16px; background:var(--ink); color:#fff;
+  padding:9px 14px; border-radius:5px; font-size:12px; opacity:0; transition:opacity .25s;
+  pointer-events:none; z-index:200; border-left:3px solid var(--money);
+}
+#toast.show{opacity:1;}
+
+/* AUTH GATE */
+#app{display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;}
+#app.authed{display:flex;}
+#auth-screen{display:none; flex:1; align-items:center; justify-content:center; padding:16px;}
+.auth-card{background:var(--panel); border:1px solid var(--rule); border-radius:8px; padding:24px 22px; width:100%; max-width:320px;}
+.auth-card .brand{margin-bottom:16px;}
+.auth-card .field{margin-bottom:10px;}
+.auth-card label{display:block; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:3px;}
+.auth-card input{width:100%;}
+.auth-card .go{width:100%; padding:8px; border-radius:5px; font-weight:700; cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:#fff; margin-top:4px;}
+.auth-card .go:disabled{opacity:.6;}
+#auth-err{color:var(--belt); font-size:11px; margin-top:8px; min-height:14px;}
+#sync-dot{font-size:10px; font-weight:600; align-self:center;}
+@media(max-width:640px){
+  .head-stats{display:none;}
+  .bud-name{width:105px;}
+  .bud-nums{width:110px;}
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN — shown until a Supabase session exists. No app UI renders before auth. -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="brand">BARES <span>FINANCIAL OS</span></div>
+    <div class="field"><label>Email</label><input type="email" id="auth-email" autocomplete="email" onkeydown="if(event.key==='Enter')signIn()"></div>
+    <div class="field"><label>Password</label><input type="password" id="auth-pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()"></div>
+    <button class="go" id="auth-go" onclick="signIn()">Sign in</button>
+    <div id="auth-err"></div>
+  </div>
+</div>
+
+<div id="app">
+
+<header>
+  <div class="brand">BARES <span>FINANCIAL OS</span></div>
+  <div class="head-stats">
+    <div class="hs"><span class="l">Card debt</span><span class="v red" id="h-debt">—</span></div>
+    <div class="hs"><span class="l">Interest/mo</span><span class="v red" id="h-int">—</span></div>
+    <div class="hs"><span class="l">Avalanche target</span><span class="v" id="h-target">—</span></div>
+    <div class="hs"><span class="l">Funds funded</span><span class="v green" id="h-funds">—</span></div>
+  </div>
+  <div class="tools">
+    <span id="sync-dot"></span>
+    <button class="tool-btn" onclick="exportData()">Export</button>
+    <button class="tool-btn" onclick="openImport()">Import</button>
+    <button class="tool-btn" onclick="signOut()">Sign out</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-t="today" onclick="showTab('today')">Today</div>
+  <div class="tab" data-t="monday" onclick="showTab('monday')">Money Monday</div>
+  <div class="tab" data-t="funds" onclick="showTab('funds')">Funds</div>
+  <div class="tab" data-t="bills" onclick="showTab('bills')">Bills</div>
+  <div class="tab" data-t="debt" onclick="showTab('debt')">Debt</div>
+  <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
+  <div class="tab" data-t="month" onclick="showTab('month')">Month-End</div>
+  <div class="tab" data-t="banks" onclick="showTab('banks')">Banks</div>
+</div>
+
+<!-- TODAY -->
+<div class="page active" id="p-today"><div class="wrap">
+  <div class="card">
+    <div class="card-h"><span id="today-title">Today</span><span id="week-sofar" style="text-transform:none;letter-spacing:0;"></span></div>
+    <div class="card-b" id="today-checks"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">Log income that landed today</div>
+    <div class="card-b">
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="inc-amt" placeholder="$ amount" step="0.01" style="width:130px;">
+        <button class="small-btn primary" onclick="addIncome()">Add</button>
+      </div>
+      <div id="inc-list" style="margin-top:8px;"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h">Note for Monday</div>
+    <div class="card-b">
+      <textarea id="day-note" rows="2" style="width:100%;" placeholder="Anything weird today? Flag it here."></textarea>
+      <div style="margin-top:7px;"><button class="small-btn" onclick="saveNote()">Save note</button></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- MONDAY -->
+<div class="page" id="p-monday"><div class="wrap">
+  <div class="card">
+    <div class="card-h">This week's income</div>
+    <div class="card-b">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <div>Logged since Monday: <b id="wk-logged">$0</b></div>
+        <input type="number" id="wk-override" placeholder="or enter total $" step="0.01" style="width:150px;">
+      </div>
+      <div class="note-line">The allocation below uses the override if you enter one, otherwise the logged total.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h">Allocation — work top to bottom</div>
+    <div class="card-b" id="alloc-rows"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">Close out the week</div>
+    <div class="card-b">
+      <input type="text" id="wk-note" placeholder="Week note (optional)" style="width:100%;">
+      <div style="margin-top:8px;"><button class="small-btn green" onclick="closeWeek()">Log this week complete</button></div>
+      <div id="wk-history" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- FUNDS -->
+<div class="page" id="p-funds"><div class="wrap">
+  <div class="note-line" style="margin-bottom:10px;">Every purchase has a fund. If the fund is empty, the answer is no — not "check the account."</div>
+  <div class="fund-grid" id="fund-grid"></div>
+  <div style="margin-top:12px;"><button class="small-btn" onclick="addFund()">+ New fund</button></div>
+</div></div>
+
+<!-- BILLS -->
+<div class="page" id="p-bills"><div class="wrap">
+  <div class="card">
+    <div class="card-h">School <button class="small-btn" onclick="addBill('school')">+ Add</button></div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Bill</th><th>Due</th><th class="r">Cost/mo</th><th>Acct</th><th>Pay</th>
+      <th class="r">J</th><th class="r">F</th><th class="r">M</th><th class="r">A</th><th class="r">M</th><th class="r">J</th><th class="r">J</th><th class="r">A</th><th class="r">S</th><th class="r">O</th><th class="r">N</th><th class="r">D</th><th></th></tr></thead>
+      <tbody id="bills-school"></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="card-h">Home <button class="small-btn" onclick="addBill('home')">+ Add</button></div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Bill</th><th>Due</th><th class="r">Cost/mo</th><th>Acct</th><th>Pay</th>
+      <th class="r">J</th><th class="r">F</th><th class="r">M</th><th class="r">A</th><th class="r">M</th><th class="r">J</th><th class="r">J</th><th class="r">A</th><th class="r">S</th><th class="r">O</th><th class="r">N</th><th class="r">D</th><th></th></tr></thead>
+      <tbody id="bills-home"></tbody>
+    </table></div>
+  </div>
+  <div class="note-line">Green amount = fixed (same every month). Blue = varies, showing YTD average. Click a month cell to log what actually got paid — multiple payments per month supported.</div>
+</div></div>
+
+<!-- DEBT -->
+<div class="page" id="p-debt"><div class="wrap">
+  <div class="card">
+    <div class="card-h">Kill list — avalanche order (highest APR first)</div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Card</th><th>Status</th><th class="r">Balance</th><th class="r">APR</th><th class="r">Interest/mo</th><th class="r">Min</th><th>Due</th></tr></thead>
+      <tbody id="debt-rows"></tbody>
+    </table></div>
+    <div class="card-b" id="debt-summary"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">Loans (not in avalanche)</div>
+    <div class="card-b" id="loan-rows"></div>
+  </div>
+</div></div>
+
+<!-- BUDGET -->
+<div class="page" id="p-budget"><div class="wrap">
+  <div class="card">
+    <div class="card-h"><span>Spending vs target — <span id="bud-month"></span></span>
+      <span><button class="small-btn" onclick="budMonth(-1)">◀</button> <button class="small-btn" onclick="budMonth(1)">▶</button></span>
+    </div>
+    <div class="card-b" id="bud-rows"></div>
+  </div>
+  <div class="note-line">Tap "+ spend" when money leaves. Groceries target is $0 on purpose — the benefit card covers food. Anything logged there is leakage worth seeing.</div>
+</div></div>
+
+<!-- MONTH -->
+<div class="page" id="p-month"><div class="wrap">
+  <div class="card">
+    <div class="card-h">First-Monday checklist</div>
+    <div class="card-b" id="month-checks"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">Log monthly P&L</div>
+    <div class="card-b">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px;">
+        <input type="month" id="pl-month">
+        <input type="number" id="pl-inc" placeholder="Income $" step="0.01">
+        <input type="number" id="pl-exp" placeholder="Expenses $" step="0.01">
+        <input type="number" id="pl-int" placeholder="Interest paid $" step="0.01">
+      </div>
+      <input type="text" id="pl-note" placeholder="Note" style="width:100%; margin-top:8px;">
+      <div style="margin-top:8px;"><button class="small-btn primary" onclick="savePL()">Save P&L</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h">P&L history</div>
+    <div class="card-b" id="pl-history"></div>
+  </div>
+</div></div>
+
+<!-- BANKS -->
+<div class="page" id="p-banks"><div class="wrap">
+  <div class="card">
+    <div class="card-h">Connected accounts
+      <span><button class="small-btn" id="bank-sync-btn" onclick="bankSync(true)">Sync</button></span>
+    </div>
+    <div class="card-b" id="bank-accts"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">Transaction inbox <button class="small-btn" onclick="bankPaste()">Paste JSON</button></div>
+    <div class="card-b" id="bank-inbox"></div>
+  </div>
+  <div class="note-line">Read-only sync via SimpleFIN. Log each transaction where it belongs: budget spending, a bill payment, or income. Balances update on sync.</div>
+</div></div>
+
+</div><!-- /#app -->
+
+<!-- MODAL -->
+<div class="overlay" id="overlay"><div class="modal" id="modal-box"></div></div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+'use strict';
+
+// ── SUPABASE (cloud persistence — BaresTKD shared project) ─────────
+const SUPABASE_URL='https://akdncbzxiwvihfcyijvm.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_uSGIk4_Tt1_BOmPBoC_U5A_Kp2032f5';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let sbUser=null;        // Supabase auth user, set after sign-in
+let cloudReady=false;   // true once the fos_state row was fetched or confirmed absent
+let fromDefaults=false; // S was seeded from defaults() because neither cloud nor mirror had data
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>'$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0=n=>'$'+Math.round(+n||0).toLocaleString('en-US');
+const MONTHS=['J','F','M','A','M','J','J','A','S','O','N','D'];
+const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const curMonthStr=()=>new Date().toISOString().slice(0,7);
+const WEEKLY={merchant:95, schoolRent:705, citi:375, drb:535, altra:360, misc:100};
+const COMMITTED=Object.values(WEEKLY).reduce((a,b)=>a+b,0);
+
+const DAILY_ITEMS=[
+  ['Scan yesterday in the TBT app','Grizzly, Bills, DRB — anything you don\'t recognize?'],
+  ['Balances above earmarks','Rent reserve intact, bill money intact, nothing about to bounce'],
+  ['Log income below','Feeds Monday\'s math automatically'],
+  ['Flag anything weird','Use the note — future you reviews it Monday'],
+];
+const MONTH_ITEMS=[
+  ['Both rents cleared on the 5th',''],
+  ['Log the P&L below','Income, expenses, interest paid'],
+  ['Re-check variable bill averages','Open Bills tab — anything drifting?'],
+  ['Kill-list check','Card at $0? Park a small bill, freeze it (close Credit One), redirect its minimum'],
+  ['Bump a fund target if life changed','Rent snowball, vault goals'],
+];
+
+// ── STATE ──────────────────────────────────────────────────────────
+let S=null;
+const KEY='bares_fos_v1';
+function defaults(){return {
+  v:1,
+  today:{},
+  weeks:[],
+  monthChecks:{},
+  // Generic starter seeds only. Real data lives in the user's Supabase row —
+  // never put personal names, balances, or bill details here (this file is
+  // publicly hosted; anyone can read its source).
+  funds:[
+    {id:1,name:'Rent',cur:0,tgt:1000,note:'Due the 1st'},
+    {id:2,name:'Emergency',cur:0,tgt:1000,note:'Start with 2 weeks of expenses'},
+    {id:3,name:'Christmas',cur:0,tgt:500,note:'Weekly deposits beat December on a card'},
+  ],
+  bills:{school:[],home:[]},
+  debts:[],
+  loans:[],
+  budget:[
+    {id:71,name:'Groceries',tgt:0},
+    {id:72,name:'Household',tgt:75},
+    {id:73,name:'Eating out',tgt:150},
+    {id:74,name:'Gas',tgt:250},
+    {id:75,name:'Misc',tgt:100},
+  ],
+  spend:{},
+  months:[],
+  bank:{url:'',lastSync:0,accounts:[],inbox:[],seen:{}},
+};}
+// localStorage is an offline mirror only. Supabase (table fos_state, one
+// jsonb row per user) is the source of truth. Every save() writes the mirror
+// immediately and upserts the whole S blob to Supabase, debounced ~800ms.
+// A failed upsert never blocks the UI or loses data: the mirror is already
+// written and the next save() retries the cloud write.
+function readMirror(){
+  try{const r=localStorage.getItem(KEY); if(r)return JSON.parse(r);}catch(e){}
+  return null;
+}
+function writeMirror(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function save(){ writeMirror(); queueCloudSave(); }
+let _saveT=null;
+function queueCloudSave(){ if(_saveT)clearTimeout(_saveT); _saveT=setTimeout(cloudSave,800); }
+async function cloudSave(){
+  if(!sbUser||!S)return;
+  try{
+    if(!cloudReady){
+      // The initial fetch failed. Re-check before writing so a fresh device
+      // that seeded defaults offline can never clobber real cloud data.
+      const {data,error}=await sb.from('fos_state').select('data').eq('user_id',sbUser.id).maybeSingle();
+      if(error)throw error;
+      if(data&&data.data&&fromDefaults){
+        S=data.data; fromDefaults=false; cloudReady=true;
+        writeMirror(); renderAll(); syncDot(true); return;
+      }
+      cloudReady=true;
+    }
+    const {error}=await sb.from('fos_state').upsert({user_id:sbUser.id,data:S,updated_at:new Date().toISOString()});
+    if(error)throw error;
+    syncDot(true);
+  }catch(e){ syncDot(false); }
+}
+function syncDot(ok){
+  const el=$('sync-dot'); if(!el)return;
+  el.textContent=ok?'Synced':'Offline';
+  el.style.color=ok?'var(--money)':'var(--amber)';
+}
+function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);}
+
+// ── MODAL ──────────────────────────────────────────────────────────
+function openModal(html){ $('modal-box').innerHTML=html; $('overlay').classList.add('open'); }
+function closeModal(){ $('overlay').classList.remove('open'); }
+$('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+
+// ── TABS ───────────────────────────────────────────────────────────
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.t===t));
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  $('p-'+t).classList.add('active');
+  if(t==='banks'&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)bankSync(false);
+}
+
+// ── TODAY ──────────────────────────────────────────────────────────
+function dayRec(){const d=todayStr(); if(!S.today[d])S.today[d]={checks:DAILY_ITEMS.map(()=>false),income:[],note:''}; return S.today[d];}
+function renderToday(){
+  const d=new Date();
+  $('today-title').textContent=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const rec=dayRec();
+  $('today-checks').innerHTML=DAILY_ITEMS.map((it,i)=>`
+    <div class="chk ${rec.checks[i]?'done':''}" onclick="togDay(${i})">
+      <div class="box">${rec.checks[i]?'✓':''}</div>
+      <div><div class="t">${it[0]}</div><div class="sub">${it[1]}</div></div>
+    </div>`).join('');
+  $('inc-list').innerHTML=rec.income.length
+    ? rec.income.map((a,i)=>`<div class="pay-item"><span>${fmt(a)}</span><button class="del" onclick="delInc(${i})">×</button></div>`).join('')
+    : '<div class="empty">Nothing logged today.</div>';
+  $('day-note').value=rec.note||'';
+  $('week-sofar').textContent='Week so far: '+fmt(weekIncome());
+}
+function togDay(i){const r=dayRec(); r.checks[i]=!r.checks[i]; save(); renderToday();}
+function addIncome(){
+  const v=parseFloat($('inc-amt').value); if(isNaN(v)||v<=0)return;
+  dayRec().income.push(v); $('inc-amt').value=''; save(); renderToday(); renderMonday(); toast('Income logged.');
+}
+function delInc(i){dayRec().income.splice(i,1); save(); renderToday(); renderMonday();}
+function saveNote(){dayRec().note=$('day-note').value; save(); toast('Note saved.');}
+function weekIncome(){
+  const now=new Date(); const day=(now.getDay()+6)%7; // Mon=0
+  const mon=new Date(now); mon.setDate(now.getDate()-day); mon.setHours(0,0,0,0);
+  let sum=0;
+  for(const[d,rec]of Object.entries(S.today)){
+    if(new Date(d+'T12:00:00')>=mon) sum+=rec.income.reduce((a,b)=>a+b,0);
+  }
+  return sum;
+}
+
+// ── MONDAY ─────────────────────────────────────────────────────────
+function avalancheTarget(){
+  const c=S.debts.filter(d=>(d.st==='payoff'||d.st==='close')&&d.bal>0).sort((a,b)=>b.apr-a.apr);
+  return c.length?c[0]:null;
+}
+function renderMonday(){
+  $('wk-logged').textContent=fmt(weekIncome());
+  const rows=[
+    [WEEKLY.merchant,'Merchant fee reserve','Stays in Grizzly — covers the ~$400 draft on the 7th'],
+    [WEEKLY.schoolRent,'School rent accrual','Stays in Grizzly — fund hits $3,028 by the 5th'],
+    [WEEKLY.citi,'Grizzly → Bills → pay Citi','Covers the week\'s business autopay charges'],
+    [WEEKLY.drb,'Grizzly → Bills → DRB','Home rent $325 + home bills $145 + QS payoff $65'],
+    [WEEKLY.altra,'→ Altra (via DRB until link is fixed)','Spending $185 + car $175'],
+    [WEEKLY.misc,'Misc reserve','Lawn, insurance financing, card minimums'],
+  ];
+  $('alloc-rows').innerHTML=rows.map((r,i)=>`
+    <div class="alloc">
+      <span class="amt">${fmt0(r[0])}</span>
+      <div class="what"><div>${r[1]}</div><div class="d">${r[2]}</div></div>
+    </div>`).join('')+surplusHTML();
+  renderWkHistory();
+}
+function surplusHTML(){
+  const ov=parseFloat($('wk-override')?$('wk-override').value:'');
+  const inc=!isNaN(ov)&&ov>0?ov:weekIncome();
+  const sur=inc-COMMITTED;
+  const tgt=avalancheTarget();
+  if(sur>=0){
+    return `<div class="surplus-box">
+      <div><div class="label">Surplus this week</div><div class="big">${fmt(sur)}</div></div>
+      <div class="tgt">${tgt?'Send it to <b>'+tgt.name+'</b> ('+tgt.apr+'% APR)':'All cards dead — fill the next fund'}</div>
+    </div>`;
+  }
+  return `<div class="surplus-box">
+    <div><div class="label">Short this week</div><div class="big red">${fmt(sur)}</div></div>
+    <div class="tgt">Lean-week order: surplus → $0, spending → $75, car → $145.<br>Never cut: rents, merchant reserve, bill transfers.</div>
+  </div>`;
+}
+document.addEventListener('input',e=>{ if(e.target.id==='wk-override') renderMonday(); });
+function closeWeek(){
+  const ov=parseFloat($('wk-override').value);
+  const inc=!isNaN(ov)&&ov>0?ov:weekIncome();
+  S.weeks.unshift({weekOf:todayStr(),income:inc,surplus:inc-COMMITTED,note:$('wk-note').value});
+  if(S.weeks.length>26)S.weeks.pop();
+  $('wk-note').value=''; $('wk-override').value='';
+  save(); renderMonday(); toast('Week logged.');
+}
+function renderWkHistory(){
+  $('wk-history').innerHTML=S.weeks.length
+    ? '<table><thead><tr><th>Week of</th><th class="r">Income</th><th class="r">Surplus</th><th>Note</th></tr></thead><tbody>'+
+      S.weeks.map(w=>`<tr><td>${w.weekOf}</td><td class="r">${fmt(w.income)}</td>
+        <td class="r" style="color:${w.surplus>=0?'var(--money)':'var(--belt)'}">${fmt(w.surplus)}</td>
+        <td style="color:var(--muted)">${w.note||''}</td></tr>`).join('')+'</tbody></table>'
+    : '<div class="empty">No weeks logged yet.</div>';
+}
+
+// ── FUNDS ──────────────────────────────────────────────────────────
+function renderFunds(){
+  $('fund-grid').innerHTML=S.funds.map(f=>{
+    const pct=f.tgt>0?Math.min(100,f.cur/f.tgt*100):0;
+    const full=f.tgt>0&&f.cur>=f.tgt;
+    return `<div class="fund ${full?'full':''}">
+      <div class="name">${f.name}</div>
+      <div class="nums"><b>${fmt(f.cur)}</b>${f.tgt>0?' of '+fmt0(f.tgt):''}</div>
+      <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="acts">
+        <button class="small-btn green" onclick="fundMove(${f.id},1)">Add</button>
+        <button class="small-btn" onclick="fundMove(${f.id},-1)">Take</button>
+        <button class="del" style="margin-left:auto" onclick="delFund(${f.id})">×</button>
+      </div>
+      ${f.note?'<div class="note">'+f.note+'</div>':''}
+    </div>`;
+  }).join('');
+  const funded=S.funds.filter(f=>f.tgt>0&&f.cur>=f.tgt).length;
+  const withTgt=S.funds.filter(f=>f.tgt>0).length;
+  $('h-funds').textContent=funded+' / '+withTgt;
+}
+function fundMove(id,dir){
+  const f=S.funds.find(x=>x.id===id); if(!f)return;
+  openModal(`<h3>${dir>0?'Add to':'Take from'} ${f.name}</h3>
+    <div class="field"><label>Amount</label><input type="number" id="m-amt" step="0.01" autofocus></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button>
+    <button class="go" onclick="fundMoveGo(${id},${dir})">${dir>0?'Add':'Take'}</button></div>`);
+  setTimeout(()=>$('m-amt').focus(),50);
+}
+function fundMoveGo(id,dir){
+  const v=parseFloat($('m-amt').value); if(isNaN(v)||v<=0)return;
+  const f=S.funds.find(x=>x.id===id);
+  f.cur=Math.max(0,f.cur+dir*v);
+  save(); closeModal(); renderFunds(); toast(f.name+' updated.');
+}
+function addFund(){
+  openModal(`<h3>New fund</h3>
+    <div class="field"><label>Name</label><input id="m-name"></div>
+    <div class="field"><label>Target $ (0 = open-ended)</label><input type="number" id="m-tgt" step="0.01"></div>
+    <div class="field"><label>Note</label><input id="m-note"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="addFundGo()">Create</button></div>`);
+}
+function addFundGo(){
+  const n=$('m-name').value.trim(); if(!n)return;
+  S.funds.push({id:Date.now(),name:n,cur:0,tgt:parseFloat($('m-tgt').value)||0,note:$('m-note').value});
+  save(); closeModal(); renderFunds();
+}
+function delFund(id){
+  const f=S.funds.find(x=>x.id===id);
+  openModal(`<h3>Delete "${f.name}"?</h3><div class="note-line">Its balance record goes with it.</div>
+  <div class="row"><button onclick="closeModal()">Keep</button><button class="go" style="background:var(--belt);border-color:var(--belt)" onclick="delFundGo(${id})">Delete</button></div>`);
+}
+function delFundGo(id){S.funds=S.funds.filter(f=>f.id!==id); save(); closeModal(); renderFunds();}
+
+// ── BILLS ──────────────────────────────────────────────────────────
+const ACCT_TAG={citi:['citi','Citi'],qs:['qs','QS'],chk:['chk-acct','Checking'],venmo:['venmo','Venmo']};
+function mTotal(act,m){const v=act[m]; if(!v)return 0; return Array.isArray(v)?v.reduce((a,b)=>a+b,0):+v;}
+function billAvg(b){
+  const vals=Object.keys(b.act||{}).map(k=>mTotal(b.act,k)).filter(v=>v>0);
+  if(!vals.length)return null;
+  return {avg:vals.reduce((a,c)=>a+c,0)/vals.length, fixed:vals.length>1&&vals.every(v=>Math.abs(v-vals[0])<0.02)};
+}
+function renderBills(){
+  ['school','home'].forEach(grp=>{
+    const tb=$('bills-'+grp);
+    tb.innerHTML=S.bills[grp].map(b=>{
+      const a=billAvg(b);
+      let cost;
+      if(a){cost=`<span style="color:${a.fixed?'var(--money)':'#1d4f9e'};font-weight:700">${fmt(a.avg)}</span>`;}
+      else if(b.hi>0){cost=`<span style="color:var(--amber)">${fmt0(b.cost)}–${fmt0(b.hi)}</span>`;}
+      else{cost=`<span style="color:var(--muted)">${fmt(b.cost)}</span>`;}
+      const tag=ACCT_TAG[b.acct]||['chk-acct',b.acct];
+      const payCls=b.pay==='auto'?'t-auto':b.pay==='manual'?'t-manual':'t-pending';
+      const payLbl=b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending';
+      const cells=MONTHS.map((m,i)=>{
+        const mo=i+1, tot=mTotal(b.act||{},mo);
+        const arr=b.act&&b.act[mo], n=Array.isArray(arr)?arr.length:(arr?1:0);
+        if(tot>0)return `<td class="mcell"><span class="amt" onclick="payModal('${grp}',${b.id},${mo})">${fmt0(tot)}</span>${n>1?'<span class="mult">×'+n+'</span>':''}</td>`;
+        return `<td class="mcell"><span class="plus" onclick="payModal('${grp}',${b.id},${mo})">+</span></td>`;
+      }).join('');
+      return `<tr><td>${b.name}</td><td style="color:var(--muted)">${b.due}</td><td class="r">${cost}</td>
+        <td><span class="tag ${tag[0]}">${tag[1]}</span></td><td><span class="${payCls}">${payLbl}</span></td>
+        ${cells}<td><button class="del" onclick="delBill('${grp}',${b.id})">×</button></td></tr>`;
+    }).join('')||'<tr><td colspan="18" class="empty">No bills.</td></tr>';
+  });
+}
+let _pg,_pid,_pm;
+function payModal(grp,id,mo){
+  _pg=grp;_pid=id;_pm=mo;
+  const b=S.bills[grp].find(x=>x.id===id);
+  if(!b.act)b.act={};
+  if(typeof b.act[mo]==='number')b.act[mo]=[b.act[mo]];
+  const list=(b.act[mo]||[]).map((v,i)=>`<div class="pay-item"><span>${fmt(v)}</span><button class="del" onclick="payDel(${i})">×</button></div>`).join('');
+  const tot=mTotal(b.act,mo);
+  openModal(`<h3>${b.name} — ${MNAMES[mo-1]}</h3>
+    <div class="pay-list">${list||'<div class="empty">No payments yet.</div>'}</div>
+    ${tot>0?'<div style="font-weight:700;color:var(--money);margin-bottom:8px">Total: '+fmt(tot)+'</div>':''}
+    <div class="field"><label>Add a payment</label><input type="number" id="m-pay" step="0.01" onkeydown="if(event.key==='Enter')payAdd()"></div>
+    <div class="row"><button onclick="closeModal()">Done</button><button class="go" onclick="payAdd()">Add</button></div>`);
+  setTimeout(()=>$('m-pay').focus(),50);
+}
+function payAdd(){
+  const v=parseFloat($('m-pay').value); if(isNaN(v)||v<=0)return;
+  const b=S.bills[_pg].find(x=>x.id===_pid);
+  if(!b.act[_pm])b.act[_pm]=[];
+  b.act[_pm].push(v); save(); renderBills(); payModal(_pg,_pid,_pm);
+}
+function payDel(i){
+  const b=S.bills[_pg].find(x=>x.id===_pid);
+  b.act[_pm].splice(i,1);
+  if(!b.act[_pm].length)delete b.act[_pm];
+  save(); renderBills(); payModal(_pg,_pid,_pm);
+}
+function addBill(grp){
+  openModal(`<h3>Add bill — ${grp}</h3>
+    <div class="field"><label>Name</label><input id="m-name"></div>
+    <div class="field"><label>Due</label><input id="m-due" placeholder="e.g. 15th"></div>
+    <div class="field"><label>Cost (or range low)</label><input type="number" id="m-cost" step="0.01"></div>
+    <div class="field"><label>Range high (blank if fixed)</label><input type="number" id="m-hi" step="0.01"></div>
+    <div class="field"><label>Account</label><select id="m-acct">
+      <option value="citi">Citi</option><option value="qs">Quicksilver</option>
+      <option value="chk">Checking</option><option value="venmo">Venmo</option></select></div>
+    <div class="field"><label>Payment</label><select id="m-pay-t">
+      <option value="auto">Autopay</option><option value="manual">Manual</option><option value="pending">Pending switch</option></select></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="addBillGo('${grp}')">Add</button></div>`);
+}
+function addBillGo(grp){
+  const n=$('m-name').value.trim(); if(!n)return;
+  S.bills[grp].push({id:Date.now(),name:n,due:$('m-due').value,cost:parseFloat($('m-cost').value)||0,
+    hi:parseFloat($('m-hi').value)||0,acct:$('m-acct').value,pay:$('m-pay-t').value,act:{}});
+  save(); closeModal(); renderBills();
+}
+function delBill(grp,id){S.bills[grp]=S.bills[grp].filter(b=>b.id!==id); save(); renderBills();}
+
+// ── DEBT ───────────────────────────────────────────────────────────
+const ST_LABEL={bills:['Bill card — paid weekly','#1d4f9e'],payoff:['Payoff target','var(--belt)'],close:['Payoff → CLOSE (fee card)','var(--belt)'],park:['Parked + frozen','var(--money)']};
+function renderDebt(){
+  const sorted=[...S.debts].sort((a,b)=>b.apr-a.apr);
+  const tgt=avalancheTarget();
+  $('debt-rows').innerHTML=sorted.map(d=>{
+    const int=d.bal*(d.apr/100)/12;
+    const isT=tgt&&tgt.id===d.id;
+    const st=ST_LABEL[d.st]||['',''];
+    return `<tr style="${isT?'background:#fdf2f1;':''}">
+      <td><b>${d.name}</b>${isT?' <span class="tag" style="background:var(--belt);color:#fff">TARGET</span>':''}${d.bal===0?' <span class="tag qs">$0 ✓</span>':''}</td>
+      <td><span style="font-size:11px;color:${st[1]}">${st[0]}</span></td>
+      <td class="r"><span class="link-num" onclick="balModal(${d.id})">${fmt(d.bal)}</span></td>
+      <td class="r">${d.apr}%</td>
+      <td class="r" style="color:${int>0?'var(--belt)':'var(--muted)'}">${int>0?fmt(int):'—'}</td>
+      <td class="r">${d.min>0?fmt0(d.min):'—'}</td>
+      <td style="color:var(--muted)">${d.due}</td></tr>`;
+  }).join('');
+  const totBal=S.debts.reduce((s,d)=>s+d.bal,0);
+  const totInt=S.debts.reduce((s,d)=>s+d.bal*(d.apr/100)/12,0);
+  $('h-debt').textContent=fmt0(totBal);
+  $('h-int').textContent=fmt(totInt);
+  $('h-target').textContent=tgt?tgt.name:'None 🎉';
+  // payoff projection
+  const killers=S.debts.filter(d=>(d.st==='payoff'||d.st==='close')&&d.bal>0).sort((a,b)=>b.apr-a.apr);
+  let proj='', months=0, pool=1350;
+  let carry=0;
+  killers.forEach(d=>{
+    months+= (d.bal)/(pool);
+    proj+=`<div style="padding:2px 0">• <b>${d.name}</b> — dead in ~${Math.ceil(months*4.3)} weeks at $${pool}/mo surplus</div>`;
+  });
+  $('debt-summary').innerHTML=`
+    <div style="font-weight:700;margin-bottom:4px">Total: ${fmt(totBal)} costing ${fmt(totInt)}/month (${fmt(totInt*12)}/yr)</div>
+    ${proj||'<div style="color:var(--money);font-weight:700">All payoff cards at zero. Surplus now fills funds.</div>'}
+    <div class="note-line">Citi's revolving balance gets chipped by the $375 weekly regardless. When a card dies: park one small bill, freeze it in the app — except Credit One, which gets closed ($99/yr fee).</div>`;
+  $('loan-rows').innerHTML=S.loans.map(l=>`<div class="alloc"><span class="amt">${fmt(l.bal)}</span>
+    <div class="what"><div><b>${l.name}</b></div><div class="d">${l.note}</div></div>
+    <button class="small-btn" onclick="loanModal()">Update</button></div>`).join('');
+}
+function balModal(id){
+  const d=S.debts.find(x=>x.id===id);
+  openModal(`<h3>${d.name} balance</h3>
+    <div class="field"><label>Current balance</label><input type="number" id="m-bal" step="0.01" value="${d.bal}"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="balGo(${id})">Save</button></div>`);
+  setTimeout(()=>$('m-bal').select(),50);
+}
+function balGo(id){
+  const v=parseFloat($('m-bal').value); if(isNaN(v)||v<0)return;
+  const d=S.debts.find(x=>x.id===id); d.bal=v;
+  if(v===0&&d.st==='payoff')d.st='park';
+  save(); closeModal(); renderDebt(); toast(d.name+' updated.');
+}
+function loanModal(){
+  const l=S.loans[0];
+  openModal(`<h3>${l.name}</h3>
+    <div class="field"><label>Balance</label><input type="number" id="m-loan" step="0.01" value="${l.bal}"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="loanGo()">Save</button></div>`);
+}
+function loanGo(){
+  const v=parseFloat($('m-loan').value); if(isNaN(v))return;
+  S.loans[0].bal=v; save(); closeModal(); renderDebt();
+}
+
+// ── BUDGET ─────────────────────────────────────────────────────────
+let budM=curMonthStr();
+function budMonth(dir){
+  const[y,m]=budM.split('-').map(Number);
+  const d=new Date(y,m-1+dir,1);
+  budM=d.toISOString().slice(0,7);
+  renderBudget();
+}
+function renderBudget(){
+  const[y,m]=budM.split('-').map(Number);
+  $('bud-month').textContent=MNAMES[m-1]+' '+y;
+  const sp=S.spend[budM]||{};
+  let totT=0, totS=0;
+  $('bud-rows').innerHTML=S.budget.map(c=>{
+    const spent=(sp[c.id]||[]).reduce((a,b)=>a+b,0);
+    totT+=c.tgt; totS+=spent;
+    const pct=c.tgt>0?Math.min(100,spent/c.tgt*100):(spent>0?100:0);
+    const over=c.tgt>0?spent>c.tgt:spent>0;
+    return `<div class="bud-row">
+      <div class="bud-name">${c.name}</div>
+      <div class="bud-bar"><div class="bud-fill ${over?'over':''}" style="width:${pct}%"></div></div>
+      <div class="bud-nums">${fmt0(spent)} / ${fmt0(c.tgt)}<div class="left">${c.tgt-spent>=0?fmt0(c.tgt-spent)+' left':fmt0(spent-c.tgt)+' OVER'}</div></div>
+      <button class="small-btn" onclick="spendModal(${c.id})">+ spend</button>
+    </div>`;
+  }).join('')+`<div class="bud-row" style="border-top:2px solid var(--rule);font-weight:700">
+    <div class="bud-name">Total</div><div class="bud-bar"></div>
+    <div class="bud-nums">${fmt0(totS)} / ${fmt0(totT)}</div><div style="width:64px"></div></div>`;
+}
+function spendModal(id){
+  const c=S.budget.find(x=>x.id===id);
+  openModal(`<h3>${c.name} — log spending</h3>
+    <div class="field"><label>Amount</label><input type="number" id="m-sp" step="0.01" onkeydown="if(event.key==='Enter')spendGo(${id})"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="spendGo(${id})">Log</button></div>`);
+  setTimeout(()=>$('m-sp').focus(),50);
+}
+function spendGo(id){
+  const v=parseFloat($('m-sp').value); if(isNaN(v)||v<=0)return;
+  if(!S.spend[budM])S.spend[budM]={};
+  if(!S.spend[budM][id])S.spend[budM][id]=[];
+  S.spend[budM][id].push(v);
+  save(); closeModal(); renderBudget(); toast('Logged.');
+}
+
+// ── MONTH ──────────────────────────────────────────────────────────
+function monthRec(){const m=curMonthStr(); if(!S.monthChecks[m])S.monthChecks[m]=MONTH_ITEMS.map(()=>false); return S.monthChecks[m];}
+function renderMonth(){
+  const rec=monthRec();
+  $('month-checks').innerHTML=MONTH_ITEMS.map((it,i)=>`
+    <div class="chk ${rec[i]?'done':''}" onclick="togMonth(${i})">
+      <div class="box">${rec[i]?'✓':''}</div>
+      <div><div class="t">${it[0]}</div>${it[1]?'<div class="sub">'+it[1]+'</div>':''}</div>
+    </div>`).join('');
+  $('pl-month').value=curMonthStr();
+  $('pl-history').innerHTML=S.months.length
+    ? '<table><thead><tr><th>Month</th><th class="r">Income</th><th class="r">Expenses</th><th class="r">Interest</th><th class="r">Net</th><th>Note</th></tr></thead><tbody>'+
+      S.months.map(p=>{const net=p.inc-p.exp;return `<tr><td>${p.month}</td><td class="r">${fmt(p.inc)}</td>
+        <td class="r">${fmt(p.exp)}</td><td class="r" style="color:var(--belt)">${fmt(p.int)}</td>
+        <td class="r" style="color:${net>=0?'var(--money)':'var(--belt)'};font-weight:700">${fmt(net)}</td>
+        <td style="color:var(--muted)">${p.note||''}</td></tr>`;}).join('')+'</tbody></table>'
+    : '<div class="empty">No months logged yet.</div>';
+}
+function togMonth(i){const r=monthRec(); r[i]=!r[i]; save(); renderMonth();}
+function savePL(){
+  const inc=parseFloat($('pl-inc').value)||0, exp=parseFloat($('pl-exp').value)||0, int=parseFloat($('pl-int').value)||0;
+  S.months.unshift({month:$('pl-month').value,inc,exp,int,note:$('pl-note').value});
+  ['pl-inc','pl-exp','pl-int','pl-note'].forEach(i=>$(i).value='');
+  save(); renderMonth(); toast('P&L saved.');
+}
+
+// ── BANKS (SimpleFIN — read-only, called directly from the browser) ─
+function bankRec(){
+  if(!S.bank)S.bank={url:'',lastSync:0,accounts:[],inbox:[],seen:{}};
+  if(!S.bank.seen)S.bank.seen={};
+  if(!S.bank.inbox)S.bank.inbox=[];
+  if(!S.bank.accounts)S.bank.accounts=[];
+  return S.bank;
+}
+function bankCreds(){
+  const b=bankRec(); if(!b.url)return null;
+  try{
+    const u=new URL(b.url);
+    const auth=btoa(decodeURIComponent(u.username)+':'+decodeURIComponent(u.password));
+    return {base:u.origin+u.pathname.replace(/\/+$/,''),auth};
+  }catch(e){return null;}
+}
+async function bankSync(manual){
+  const b=bankRec(), c=bankCreds();
+  if(!c){ if(manual)bankConnect(); return; }
+  const btn=$('bank-sync-btn'); if(btn){btn.disabled=true;btn.textContent='Syncing…';}
+  try{
+    const now=Math.floor(Date.now()/1000);
+    let start=b.lastSync?Math.floor(b.lastSync/1000)-7*86400:now-30*86400;
+    if(now-start>89*86400)start=now-89*86400;
+    const res=await fetch(c.base+'/accounts?start-date='+start,{headers:{Authorization:'Basic '+c.auth}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    b.accounts=(data.accounts||[]).map(a=>({id:a.id,org:(a.org&&(a.org.name||a.org.domain))||'',
+      name:a.name,balance:a.balance,asOf:a['balance-date']}));
+    let added=0;
+    (data.accounts||[]).forEach(a=>(a.transactions||[]).forEach(t=>{
+      const key=a.id+'|'+t.id;
+      if(b.seen[key])return;
+      b.seen[key]=t.posted||now;
+      b.inbox.push({acct:a.name,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending});
+      added++;
+    }));
+    const cutoff=now-180*86400;
+    for(const k of Object.keys(b.seen)){ if(b.seen[k]<cutoff)delete b.seen[k]; }
+    b.inbox.sort((x,y)=>(y.posted||0)-(x.posted||0));
+    if(b.inbox.length>300)b.inbox.length=300;
+    b.lastSync=Date.now();
+    save(); renderBanks();
+    if(manual&&data.errors&&data.errors.length)toast(String(data.errors[0]).slice(0,120));
+    else if(manual)toast(added?added+' new transaction'+(added===1?'':'s')+'.':'Up to date.');
+  }catch(e){ if(manual)toast('Sync failed. Check the connection and try again.'); }
+  finally{ const b2=$('bank-sync-btn'); if(b2){b2.disabled=false;b2.textContent='Sync';} }
+}
+function renderBanks(){
+  const b=bankRec();
+  if(!b.url){
+    $('bank-accts').innerHTML=`<div class="note-line">Not connected. SimpleFIN gives this app read-only balances and transactions across all your banks (~$1.50/mo).<br>
+      1. Create an account at bridge.simplefin.org and link your banks there.<br>
+      2. Generate a setup token (New App).<br>
+      3. Paste the token here.</div>
+      <div style="margin-top:8px"><button class="small-btn primary" onclick="bankConnect()">Connect SimpleFIN</button></div>`;
+  }else{
+    $('bank-accts').innerHTML=(b.accounts.length
+      ? '<div style="overflow-x:auto"><table><thead><tr><th>Account</th><th>Bank</th><th class="r">Balance</th><th>As of</th></tr></thead><tbody>'+
+        b.accounts.map(a=>`<tr><td><b>${esc(a.name)}</b></td><td style="color:var(--muted)">${esc(a.org)}</td>
+          <td class="r" style="font-weight:700;color:${parseFloat(a.balance)<0?'var(--belt)':'var(--money)'}">${fmt(a.balance)}</td>
+          <td style="color:var(--muted)">${a.asOf?new Date(a.asOf*1000).toLocaleDateString():''}</td></tr>`).join('')+'</tbody></table></div>'
+      : '<div class="empty">No accounts yet — hit Sync.</div>')+
+      `<div class="note-line" style="margin-top:6px">Last sync: ${b.lastSync?new Date(b.lastSync).toLocaleString():'never'} · <span class="link-num" onclick="bankDisconnect()">Disconnect</span></div>`;
+  }
+  $('bank-inbox').innerHTML=b.inbox.length?b.inbox.map((t,i)=>{
+    const d=t.posted?new Date(t.posted*1000):null;
+    return `<div class="alloc">
+      <span class="amt" style="color:${t.amount<0?'var(--belt)':'var(--money)'}">${fmt(t.amount)}</span>
+      <div class="what"><div>${esc(t.desc)||'(no description)'}${t.pending?' <span class="t-pending">pending</span>':''}</div>
+        <div class="d">${d?d.toLocaleDateString():''} · ${esc(t.acct)}</div></div>
+      <button class="small-btn" onclick="txnSpend(${i})">Spend</button>
+      <button class="small-btn" onclick="txnBill(${i})">Bill</button>
+      ${t.amount>0?`<button class="small-btn green" onclick="txnIncome(${i})">Income</button>`:''}
+      <button class="del" onclick="txnDismiss(${i})">×</button>
+    </div>`;
+  }).join(''):'<div class="empty">Nothing to review.</div>';
+}
+function bankConnect(){
+  openModal(`<h3>Connect SimpleFIN</h3>
+    <div class="note-line" style="margin-bottom:8px">Paste your setup token from bridge.simplefin.org (New App), or a claimed access URL.</div>
+    <div class="field"><label>Setup token or access URL</label><textarea id="m-sfin" rows="3"></textarea></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" id="m-sfin-go" onclick="bankConnectGo()">Connect</button></div>`);
+  setTimeout(()=>$('m-sfin').focus(),50);
+}
+async function bankConnectGo(){
+  const v=$('m-sfin').value.trim(); if(!v)return;
+  const btn=$('m-sfin-go'); btn.disabled=true; btn.textContent='Connecting…';
+  try{
+    let url=v;
+    if(!/^https?:\/\//i.test(v)){
+      const claim=atob(v.replace(/\s+/g,''));
+      if(!/^https?:\/\//i.test(claim))throw new Error('bad token');
+      const r=await fetch(claim,{method:'POST'});
+      if(!r.ok)throw new Error('claim failed');
+      url=(await r.text()).trim();
+    }
+    if(!/^https?:\/\//i.test(url))throw new Error('bad url');
+    bankRec().url=url;
+    save(); closeModal(); renderBanks();
+    toast('Connected. Syncing…');
+    bankSync(true);
+  }catch(e){
+    btn.disabled=false; btn.textContent='Connect';
+    toast('Could not connect. Check the token and try again.');
+  }
+}
+function bankDisconnect(){
+  openModal(`<h3>Disconnect SimpleFIN?</h3><div class="note-line">Removes the connection and clears the inbox. Everything already logged stays.</div>
+    <div class="row"><button onclick="closeModal()">Keep</button><button class="go" style="background:var(--belt);border-color:var(--belt)" onclick="bankDisconnectGo()">Disconnect</button></div>`);
+}
+function bankDisconnectGo(){
+  S.bank={url:'',lastSync:0,accounts:[],inbox:[],seen:{}};
+  save(); closeModal(); renderBanks(); toast('Disconnected.');
+}
+function txnDismiss(i){ bankRec().inbox.splice(i,1); save(); renderBanks(); }
+function txnIncome(i){
+  const t=bankRec().inbox[i]; if(!t||t.amount<=0)return;
+  const ds=(t.posted?new Date(t.posted*1000):new Date()).toISOString().slice(0,10);
+  if(!S.today[ds])S.today[ds]={checks:DAILY_ITEMS.map(()=>false),income:[],note:''};
+  S.today[ds].income.push(t.amount);
+  bankRec().inbox.splice(i,1);
+  save(); renderBanks(); renderToday(); renderMonday(); toast('Income logged.');
+}
+function txnSpend(i){
+  const t=bankRec().inbox[i]; if(!t)return;
+  openModal(`<h3>Log as spending</h3>
+    <div class="note-line" style="margin-bottom:8px">${esc(t.desc)} · ${fmt(Math.abs(t.amount))}</div>
+    <div class="field"><label>Category</label><select id="m-cat">${S.budget.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="txnSpendGo(${i})">Log</button></div>`);
+}
+function txnSpendGo(i){
+  const t=bankRec().inbox[i]; if(!t)return;
+  const id=+$('m-cat').value;
+  const m=(t.posted?new Date(t.posted*1000):new Date()).toISOString().slice(0,7);
+  if(!S.spend[m])S.spend[m]={};
+  if(!S.spend[m][id])S.spend[m][id]=[];
+  S.spend[m][id].push(Math.abs(t.amount));
+  bankRec().inbox.splice(i,1);
+  save(); closeModal(); renderBanks(); renderBudget(); toast('Logged.');
+}
+function txnBill(i){
+  const t=bankRec().inbox[i]; if(!t)return;
+  const opts=['school','home'].map(g=>`<optgroup label="${g==='school'?'School':'Home'}">`+
+    S.bills[g].map(x=>`<option value="${g}:${x.id}">${esc(x.name)}</option>`).join('')+'</optgroup>').join('');
+  openModal(`<h3>Log as bill payment</h3>
+    <div class="note-line" style="margin-bottom:8px">${esc(t.desc)} · ${fmt(Math.abs(t.amount))}</div>
+    <div class="field"><label>Bill</label><select id="m-bill">${opts}</select></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="txnBillGo(${i})">Log</button></div>`);
+}
+function txnBillGo(i){
+  const t=bankRec().inbox[i]; if(!t)return;
+  const parts=$('m-bill').value.split(':');
+  const bl=S.bills[parts[0]].find(x=>x.id===+parts[1]); if(!bl)return;
+  const mo=(t.posted?new Date(t.posted*1000):new Date()).getMonth()+1;
+  if(!bl.act)bl.act={};
+  if(typeof bl.act[mo]==='number')bl.act[mo]=[bl.act[mo]];
+  if(!bl.act[mo])bl.act[mo]=[];
+  bl.act[mo].push(Math.abs(t.amount));
+  bankRec().inbox.splice(i,1);
+  save(); closeModal(); renderBanks(); renderBills(); toast('Payment logged.');
+}
+function bankPaste(){
+  openModal(`<h3>Paste transactions</h3>
+    <div class="note-line" style="margin-bottom:8px">JSON array like [{"date":"2026-09-08","amount":-45.20,"description":"HEB","account":"Altra"}]. ChatGPT can produce this from its bank connection; the format is documented in HANDOFF-CHATGPT.md.</div>
+    <div class="field"><label>JSON</label><textarea id="m-txns" rows="6"></textarea></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="bankPasteGo()">Add to inbox</button></div>`);
+}
+function bankPasteGo(){
+  try{
+    const arr=JSON.parse($('m-txns').value);
+    if(!Array.isArray(arr))throw new Error('bad');
+    const b=bankRec(); let n=0;
+    arr.forEach(t=>{
+      const amt=parseFloat(t.amount); if(isNaN(amt))return;
+      const posted=t.date?Math.floor(new Date(t.date+'T12:00:00').getTime()/1000):Math.floor(Date.now()/1000);
+      b.inbox.push({acct:String(t.account||'Pasted'),posted,amount:amt,desc:String(t.description||t.payee||''),pending:false});
+      n++;
+    });
+    b.inbox.sort((x,y)=>(y.posted||0)-(x.posted||0));
+    save(); closeModal(); renderBanks(); toast(n+' added to inbox.');
+  }catch(e){ toast('That doesn\'t look like a transactions JSON array.'); }
+}
+
+// ── EXPORT / IMPORT ────────────────────────────────────────────────
+function exportData(){
+  // The SimpleFIN access URL is a bank credential — never let it leave in a backup file.
+  const copy=JSON.parse(JSON.stringify(S));
+  if(copy.bank)copy.bank.url='';
+  const blob=new Blob([JSON.stringify(copy,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='bares-financial-os-'+todayStr()+'.json';
+  a.click();
+  toast('Backup downloaded.');
+}
+function openImport(){
+  openModal(`<h3>Import backup</h3>
+    <div class="field"><label>Paste backup JSON</label><textarea id="m-imp" rows="6"></textarea></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="importGo()">Import</button></div>`);
+}
+function importGo(){
+  try{
+    const data=JSON.parse($('m-imp').value);
+    if(!data.funds||!data.debts)throw new Error('bad');
+    const prevBankUrl=S&&S.bank?S.bank.url:'';
+    S=data;
+    if(prevBankUrl&&!bankRec().url)S.bank.url=prevBankUrl; // backups don't carry the credential
+    save(); closeModal(); renderAll(); toast('Backup restored.');
+  }catch(e){toast('That doesn\'t look like a valid backup.');}
+}
+
+// ── AUTH GATE ──────────────────────────────────────────────────────
+// No app UI (tabs, data) renders until a Supabase session exists.
+async function boot(){
+  // Shared BTKD pattern: session tokens handed off via URL params + setSession.
+  try{
+    const qs=new URLSearchParams(location.search);
+    const hs=new URLSearchParams((location.hash||'').replace(/^#/,''));
+    const at=qs.get('access_token')||hs.get('access_token');
+    const rt=qs.get('refresh_token')||hs.get('refresh_token');
+    if(at&&rt){
+      await sb.auth.setSession({access_token:at,refresh_token:rt});
+      history.replaceState(null,'',location.pathname);
+    }
+  }catch(e){}
+  let session=null;
+  try{ session=(await sb.auth.getSession()).data.session; }catch(e){}
+  if(session){ await enterApp(session.user); }
+  else{ $('auth-screen').style.display='flex'; setTimeout(()=>{const e=$('auth-email'); if(e)e.focus();},50); }
+  sb.auth.onAuthStateChange(ev=>{ if(ev==='SIGNED_OUT'&&sbUser){ sbUser=null; location.reload(); } });
+}
+async function signIn(){
+  const email=$('auth-email').value.trim(), pw=$('auth-pw').value;
+  const err=$('auth-err'); err.textContent='';
+  if(!email||!pw){ err.textContent='Enter email and password.'; return; }
+  const btn=$('auth-go'); btn.disabled=true;
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pw});
+  btn.disabled=false;
+  if(error){ err.textContent=error.message; return; }
+  $('auth-screen').style.display='none';
+  await enterApp(data.user);
+}
+async function signOut(){ try{await sb.auth.signOut();}catch(e){} sbUser=null; location.reload(); }
+async function enterApp(user){
+  sbUser=user;
+  $('auth-screen').style.display='none';
+  await loadState();
+  $('app').classList.add('authed');
+  renderAll();
+}
+async function loadState(){
+  let row=null, fetched=false;
+  try{
+    const {data,error}=await sb.from('fos_state').select('data').eq('user_id',sbUser.id).maybeSingle();
+    if(error)throw error;
+    fetched=true; row=data;
+  }catch(e){}
+  cloudReady=fetched;
+  if(fetched&&row&&row.data){
+    S=row.data; writeMirror(); syncDot(true); return;
+  }
+  const local=readMirror();
+  if(local){
+    // One-time migration: adopt the localStorage data and push it up now
+    // so nothing is lost. If the upsert fails it retries on the next save.
+    S=local; cloudSave();
+  }else{
+    S=defaults(); fromDefaults=true;
+    writeMirror(); if(fetched)cloudSave();
+  }
+  if(!fetched)syncDot(false);
+}
+
+// ── BOOT ───────────────────────────────────────────────────────────
+function renderAll(){renderToday();renderMonday();renderFunds();renderBills();renderDebt();renderBudget();renderMonth();renderBanks();}
+boot();
+</script>
+</body>
+</html>
