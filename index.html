@@ -1216,14 +1216,15 @@ function acctRemove(i){
   save(); closeModal(); renderHome();
 }
 function addAccount(){
-  const linked=!!bankRec().url;
+  const linked=!!bankRec().url, hiddenN=acctRec().filter(a=>a.hidden).length;
   openModal(`<h3>Add account</h3>
     <div class="note-line" style="margin-bottom:10px">Linking a bank through SimpleFIN brings in every account under that login and keeps them synced. Use Manual for anything that can't link.</div>
     <div class="field"><button class="small-btn primary" style="width:100%;padding:8px" onclick="${linked?'addLinked()':'closeModal();bankConnect()'}">${linked?'Link another bank (SimpleFIN)':'Link a bank (SimpleFIN)'}</button></div>
     <div class="field"><button class="small-btn" style="width:100%;padding:8px" onclick="addManual()">Add a manual account</button></div>
-    ${linked?'':'<div class="note-line">Hidden synced accounts come back from the account menu after a sync.</div>'}
+    ${hiddenN?`<div class="field"><button class="small-btn" style="width:100%;padding:8px" onclick="acctUnhideAll()">Show ${hiddenN} hidden account${hiddenN===1?'':'s'}</button></div>`:''}
     <div class="row"><button onclick="closeModal()">Cancel</button></div>`);
 }
+function acctUnhideAll(){ acctRec().forEach(a=>{ a.hidden=false; }); save(); closeModal(); renderHome(); toast('Hidden accounts restored.'); }
 function addLinked(){
   openModal(`<h3>Link another bank</h3>
     <div class="note-line" style="line-height:1.7">1. Open <b>bridge.simplefin.org</b> and sign in.<br>2. Connect the bank there.<br>3. Come back and tap <b>Sync</b>. Every account under that login appears here on its own.</div>
