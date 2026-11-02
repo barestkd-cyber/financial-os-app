@@ -940,14 +940,21 @@ async function bankSync(manual){
     b.accounts=(data.accounts||[]).map(a=>({id:a.id,org:(a.org&&(a.org.name||a.org.domain))||'',
       name:a.name,balance:a.balance,asOf:a['balance-date']}));
     // Registry update: match by SimpleFIN account id so a synced account is never duplicated.
-    const reg=acctRec(), seenIds=new Set();
+    const reg=acctRec(), incoming=new Set(b.accounts.map(a=>a.id));
+    const same=(s,t)=>String(s||'').trim().toLowerCase()===String(t||'').trim().toLowerCase();
     b.accounts.forEach(a=>{
-      seenIds.add(a.id);
-      const r=reg.find(x=>x.source==='synced'&&x.sfId===a.id);
-      if(!r){ reg.push(mkSynced(a)); return; }
+      let r=reg.find(x=>x.source==='synced'&&x.sfId===a.id);
+      if(!r){
+        // A relinked bank can hand the same account a new id. Adopt the entry
+        // whose old id is no longer reported and whose bank + name match, so
+        // nickname/type carry over instead of creating a duplicate.
+        r=reg.find(x=>x.source==='synced'&&!incoming.has(x.sfId)&&same(x.name,a.name)&&same(x.inst,a.org));
+        if(r){ r.sfId=a.id; r.id='sf:'+a.id; incoming.add(a.id); }
+        else{ reg.push(mkSynced(a)); return; }
+      }
       r.name=a.name; if(a.org)r.inst=a.org; r.balance=parseFloat(a.balance)||0; r.asOf=a.asOf||r.asOf; r.stale=false;
     });
-    reg.forEach(r=>{ if(r.source==='synced'&&!seenIds.has(r.sfId))r.stale=true; });
+    reg.forEach(r=>{ if(r.source==='synced'&&!incoming.has(r.sfId))r.stale=true; });
     b.lastErrors=(data.errors||[]).map(x=>String(x).slice(0,160)).slice(0,5);
     let added=0;
     (data.accounts||[]).forEach(a=>(a.transactions||[]).forEach(t=>{
