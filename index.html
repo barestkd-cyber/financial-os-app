@@ -1134,8 +1134,9 @@ function acctRec(){
 }
 function guessType(name,balance){
   const n=String(name||'').toLowerCase();
-  if(/credit|card|visa|mastercard|amex|platinum|discover|quicksilver/.test(n))return 'credit';
-  if(/loan|auto|mortgage/.test(n))return 'loan';
+  if(/credit|card|\bcc\b|visa|mastercard|amex|platinum|discover|quicksilver/.test(n))return 'credit';
+  if(/loan|auto|mortgage|vehicle|escalade/.test(n))return 'loan';
+  if(/\b(19|20)\d\d\b/.test(n)&&parseFloat(balance)<0)return 'loan';
   if(/sav|vault|money market|\bcd\b/.test(n))return 'savings';
   if(/check|chk|spend|bills|debit/.test(n))return 'checking';
   if(parseFloat(balance)<0)return 'credit';
