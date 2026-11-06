@@ -1326,6 +1326,7 @@ async function enterApp(user){
   await loadState();
   $('app').classList.add('authed');
   renderAll();
+  showTab('home');
 }
 async function loadState(){
   let row=null, fetched=false;
