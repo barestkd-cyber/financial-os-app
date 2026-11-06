@@ -206,6 +206,16 @@ tr:hover td{background:#fcfbf8;}
 .tag.attn{background:#faf3e0; color:var(--amber);}
 .attn-box{border-color:var(--amber);}
 .attn-box .card-b{color:var(--amber); font-size:12px;}
+.acct.nest{padding-left:16px; border-left:2px solid var(--soft); margin-left:4px;}
+.acct .flow{font-size:11px; color:var(--money); font-weight:600;}
+.tree-note{font-size:11px; color:var(--muted); padding:7px 0 2px; line-height:1.5;}
+.sec-lbl{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:14px 0 6px;}
+.inc{display:flex; gap:10px; flex-wrap:wrap;}
+.inc .cell{flex:1; min-width:120px;}
+.inc .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
+.inc .amt{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money);}
+.inc .amt.zero{color:#bbb;}
+.inc .when{font-size:11px; color:var(--muted);}
 
 /* AUTH GATE */
 #app{display:none; flex-direction:column; flex:1; min-height:0; overflow:hidden;}
@@ -275,7 +285,7 @@ tr:hover td{background:#fcfbf8;}
   <div class="home-top">
     <div><div class="home-q">Where is my money right now?</div><div class="home-sub" id="home-sub"></div></div>
     <div style="display:flex; gap:6px;">
-      <button class="small-btn" id="home-sync-btn" onclick="bankSync(true)">Sync</button>
+      <button class="small-btn" id="home-sync-btn" onclick="syncAll(true)">Sync</button>
       <button class="small-btn primary" onclick="addAccount()">+ Add Account</button>
     </div>
   </div>
@@ -501,6 +511,7 @@ function defaults(){return {
   months:[],
   bank:{url:'',lastSync:0,accounts:[],inbox:[],seen:{}},
   accounts:[],
+  stripe:{key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''},
 };}
 // localStorage is an offline mirror only. Supabase (table fos_state, one
 // jsonb row per user) is the source of truth. Every save() writes the mirror
@@ -552,7 +563,9 @@ function showTab(t){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   $('p-'+t).classList.add('active');
   if((t==='banks'||t==='home')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)bankSync(false);
+  if(t==='home'&&S&&stripeRec().key&&Date.now()-stripeRec().lastSync>3600*1000)stripeSync(false);
 }
+function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); }
 
 // ── TODAY ──────────────────────────────────────────────────────────
 function dayRec(){const d=todayStr(); if(!S.today[d])S.today[d]={checks:DAILY_ITEMS.map(()=>false),income:[],note:''}; return S.today[d];}
@@ -1123,7 +1136,6 @@ function bankPasteGo(){
 // manual card entered as "owed 500" is stored as -500. Per-account
 // transactions and virtual buckets will hang off these ids later.
 const ACCT_TYPES={checking:'Checking',savings:'Savings',cash:'Cash',credit:'Credit card',loan:'Loan',other:'Other'};
-const ACCT_GROUPS=[['cash','Cash & Savings',['checking','savings','cash']],['debt','Credit Cards / Debt',['credit','loan']],['other','Other',['other']]];
 const isDebtType=t=>t==='credit'||t==='loan';
 function acctRec(){
   if(!S.accounts){
@@ -1152,14 +1164,43 @@ function acctStatus(a){
   if(a.asOf&&Date.now()/1000-a.asOf>7*86400)return ['attn','Needs attention'];
   return ['ok','Synced'];
 }
-function acctRowHTML(a,i){
+function acctRowHTML(a,i,extra){
   const st=acctStatus(a), bal=+a.balance||0, debt=isDebtType(a.type);
   const sub2=[debt&&bal<0?'owed':'',a.asOf?'as of '+new Date(a.asOf*1000).toLocaleDateString():''].filter(Boolean).join(' · ');
-  return `<div class="acct" onclick="acctOpen(${i})">
+  const x=extra||{};
+  return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
     <div><div class="nm">${esc(a.nick||a.name)}</div>
-      <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span></div></div>
+      <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
     <div class="bal ${bal<0?'neg':''}">${fmt(debt?Math.abs(bal):bal)}${sub2?'<span class="asof">'+sub2+'</span>':''}</div>
   </div>`;
+}
+// Money tree: Income -> Hub -> Dispatch (with the cards each one pays) -> Savings -> Loans -> Payoff targets.
+// Roles live on the accounts themselves (role: hub|dispatch, feed: $/wk from the hub, payer: account id
+// that pays a card). Accounts with no role fall into Savings & other / Payoff, so a fresh registry still renders.
+function acctLabel(a){ return a?(a.nick||a.name):''; }
+function treeCard(title,rows,opts){
+  const o=opts||{}, tot=rows.reduce((s,x)=>s+(+x.a.balance||0),0);
+  const totTxt=o.debt?fmt(Math.abs(tot))+(tot<0?' owed':''):fmt(tot);
+  return `<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
+    <div class="card-b" style="padding:0 12px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
+}
+function renderIncoming(){
+  const s=stripeRec();
+  if(!s.key){
+    return `<div class="card"><div class="card-h"><span>Incoming</span></div><div class="card-b">
+      <div class="note-line">Show money that is on its way from Stripe before it lands in the bank.</div>
+      <div style="margin-top:8px"><button class="small-btn primary" onclick="stripeConnect()">Connect Stripe</button></div></div></div>`;
+  }
+  const hub=acctRec().find(a=>a.role==='hub'&&!a.hidden);
+  const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'nothing scheduled';
+  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Incoming</span><span class="grp-tot" style="font-weight:500;color:var(--muted)">${s.lastSync?'checked '+new Date(s.lastSync).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):''}</span></div>
+    <div class="card-b">${s.err?'<div class="note-line" style="color:var(--amber);margin:0 0 8px">'+esc(s.err)+'</div>':''}
+      <div class="inc">
+        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">collected, not paid out yet</div></div>
+        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'nothing in transit'}</div></div>
+        <div class="cell"><div class="lbl">Lands in</div><div class="amt" style="font-size:13px;color:var(--ink)">${hub?esc(acctLabel(hub)):'<span style="color:#bbb">no hub set</span>'}</div><div class="when">${hub?'Stripe payouts':'tap an account, set role to Hub'}</div></div>
+      </div>
+      <div class="note-line" style="margin-top:8px"><span class="link-num" onclick="stripeConnect()">Stripe settings</span></div></div></div>`;
 }
 function renderHome(){
   const reg=acctRec(), b=bankRec();
@@ -1169,18 +1210,53 @@ function renderHome(){
     html+=`<div class="card attn-box"><div class="card-b">${b.lastErrors.map(esc).join('<br>')}
       <div class="note-line">Fix the connection at bridge.simplefin.org, then Sync.</div></div></div>`;
   }
+  html+='<div class="sec-lbl">Income</div>'+renderIncoming();
   if(!vis.length){
     html+=`<div class="card"><div class="card-b"><div class="note-line">No accounts yet. Add your accounts to see where your money is.</div>
       <div style="margin-top:8px"><button class="small-btn primary" onclick="addAccount()">+ Add Account</button></div></div></div>`;
+    $('home-groups').innerHTML=html; $('home-sub').textContent=''; return;
   }
-  ACCT_GROUPS.forEach(g=>{
-    const rows=vis.filter(x=>g[2].includes(x.a.type));
-    if(!rows.length)return;
-    const tot=rows.reduce((s,x)=>s+(+x.a.balance||0),0);
-    const totTxt=g[0]==='debt'?fmt(Math.abs(tot))+(tot<0?' owed':''):fmt(tot);
-    html+=`<div class="card"><div class="card-h"><span>${g[1]}</span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
-      <div class="card-b" style="padding:0 12px">${rows.map(x=>acctRowHTML(x.a,x.i)).join('')}</div></div>`;
-  });
+  const byId={}; vis.forEach(x=>{ byId[x.a.id]=x; });
+  const cash=x=>!isDebtType(x.a.type);
+  const hubs=vis.filter(x=>cash(x)&&x.a.role==='hub');
+  const disp=vis.filter(x=>cash(x)&&x.a.role==='dispatch');
+  const dispIds=new Set(disp.map(x=>x.a.id));
+  const paid=vis.filter(x=>x.a.type==='credit'&&x.a.payer&&dispIds.has(x.a.payer));
+  const savings=vis.filter(x=>cash(x)&&x.a.role!=='hub'&&x.a.role!=='dispatch');
+  const loans=vis.filter(x=>x.a.type==='loan');
+  const payoff=vis.filter(x=>x.a.type==='credit'&&!(x.a.payer&&dispIds.has(x.a.payer)));
+  const hubName=hubs.length?acctLabel(hubs[0].a):'';
+  // Hub
+  html+='<div class="sec-lbl">Hub</div>';
+  if(hubs.length){
+    const feeds=disp.filter(x=>+x.a.feed>0).map(x=>fmt0(+x.a.feed)+' to '+esc(acctLabel(x.a))).join(' · ');
+    html+=treeCard('Income lands here',hubs.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),
+      {after:feeds?`<div class="tree-note">Money Monday, every week: ${feeds}</div>`:''});
+  }else{
+    html+=`<div class="card"><div class="card-b"><div class="note-line">No hub yet. Tap the account your income lands in and set its role to Hub.</div></div></div>`;
+  }
+  // Dispatch accounts, each with the cards it pays nested under it
+  if(disp.length){
+    html+='<div class="sec-lbl">Dispatch</div>';
+    const rows=[];
+    disp.forEach(x=>{
+      rows.push({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})});
+      paid.filter(c=>c.a.payer===x.a.id).forEach(c=>rows.push({a:{balance:0},html:acctRowHTML(c.a,c.i,{nest:true,flow:'paid from '+acctLabel(x.a)})}));
+    });
+    html+=treeCard('Pays the bills',rows);
+  }
+  if(savings.length){
+    html+='<div class="sec-lbl">Savings & other</div>';
+    html+=treeCard('Reserves and vaults',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
+  }
+  if(loans.length){
+    html+='<div class="sec-lbl">Loans</div>';
+    html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
+  }
+  if(payoff.length){
+    html+='<div class="sec-lbl">Debt payoff targets</div>';
+    html+=treeCard('No new charges',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
+  }
   $('home-groups').innerHTML=html;
   const n=vis.length, sn=vis.filter(x=>x.a.source==='synced').length;
   $('home-sub').textContent=n?`${n} account${n===1?'':'s'} · ${sn} synced · last sync ${b.lastSync?new Date(b.lastSync).toLocaleString():'never'}`:'';
@@ -1198,6 +1274,9 @@ function acctOpen(i){
     ${synced?'':`<div class="field"><label>Institution</label><input id="m-inst" value="${esc(a.inst)}"></div>`}
     <div class="field"><label>Type</label><select id="m-type" onchange="acctBalLabel()">${acctTypeOpts(a.type)}</select></div>
     ${synced?'':`<div class="field"><label id="m-bal-l">${isDebtType(a.type)?'Amount owed':'Current balance'}</label><input type="number" id="m-bal" step="0.01" value="${Math.abs(bal)}"></div>`}
+    ${a.type==='credit'?`<div class="field"><label>Paid from</label><select id="m-payer"><option value="">Nobody (payoff target)</option>${acctRec().filter(d=>d.role==='dispatch'&&!d.hidden).map(d=>`<option value="${esc(d.id)}" ${d.id===a.payer?'selected':''}>${esc(acctLabel(d))}</option>`).join('')}</select></div>`:
+      isDebtType(a.type)?'':`<div class="field"><label>Role in the money tree</label><select id="m-role" onchange="acctRoleUI()"><option value="">None (savings / other)</option><option value="hub" ${a.role==='hub'?'selected':''}>Hub (income lands here)</option><option value="dispatch" ${a.role==='dispatch'?'selected':''}>Dispatch (pays bills)</option></select></div>
+      <div class="field" id="m-feed-f" style="${a.role==='dispatch'?'':'display:none'}"><label>Weekly transfer in from the hub</label><input type="number" id="m-feed" step="1" value="${+a.feed||''}"></div>`}
     <div class="field"><label>Note</label><input id="m-note" value="${esc(a.note||'')}"></div>
     <div class="note-line">Transactions and buckets for this account will live here.</div>
     <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="acctSaveGo(${i})">Save</button></div>
@@ -1215,8 +1294,13 @@ function acctSaveGo(i){
     a.asOf=Math.floor(Date.now()/1000);
   }
   a.type=$('m-type').value; a.note=$('m-note').value;
+  const role=$('m-role'), feed=$('m-feed'), payer=$('m-payer');
+  if(role){ a.role=role.value; a.feed=a.role==='dispatch'?(parseFloat(feed.value)||0):0; }
+  if(payer){ a.payer=payer.value; }
+  if(isDebtType(a.type)){ a.role=''; a.feed=0; } else { a.payer=''; }
   save(); closeModal(); renderHome(); toast('Saved.');
 }
+function acctRoleUI(){ const r=$('m-role'), f=$('m-feed-f'); if(r&&f)f.style.display=r.value==='dispatch'?'':'none'; }
 function acctRemove(i){
   const a=acctRec()[i]; if(!a)return;
   if(a.source==='synced'){ a.hidden=true; }
@@ -1257,11 +1341,59 @@ function addManualGo(){
   save(); closeModal(); renderHome(); toast('Account added.');
 }
 
+// ── INCOMING (Stripe) ──────────────────────────────────────────────
+// Read-only view of money on its way from Stripe, called browser-direct with a
+// restricted key (Balance: read, Payouts: read, nothing else). On deck = Stripe's
+// pending + available balance (collected, not yet paid out). On the way = payouts
+// Stripe has created that the bank hasn't received (status pending / in_transit).
+// The key is a credential: synced in the RLS row, stripped from exports.
+function stripeRec(){
+  if(!S.stripe)S.stripe={key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''};
+  return S.stripe;
+}
+async function stripeSync(manual){
+  const s=stripeRec(); if(!s.key)return;
+  const h={headers:{Authorization:'Bearer '+s.key}};
+  try{
+    const [rb,rp]=await Promise.all([fetch('https://api.stripe.com/v1/balance',h),fetch('https://api.stripe.com/v1/payouts?limit=20',h)]);
+    if(rb.status===401||rp.status===401)throw new Error('Stripe rejected the key. Create a new restricted key and paste it again.');
+    if(!rb.ok||!rp.ok)throw new Error('Stripe returned an error. Try again later.');
+    const bal=await rb.json(), po=await rp.json();
+    const usd=list=>(list||[]).filter(x=>x.currency==='usd').reduce((t,x)=>t+(x.amount||0),0);
+    s.onDeck=(usd(bal.available)+usd(bal.pending))/100;
+    const moving=(po.data||[]).filter(p=>p.status==='pending'||p.status==='in_transit');
+    s.onWay=moving.reduce((t,p)=>t+(p.amount||0),0)/100;
+    s.arrival=moving.length?Math.min(...moving.map(p=>p.arrival_date||0).filter(Boolean)):0;
+    s.err=''; s.lastSync=Date.now();
+    save(); renderHome();
+    if(manual)toast('Stripe up to date.');
+  }catch(e){ s.err=String(e.message||e).slice(0,160); save(); renderHome(); if(manual)toast('Stripe check failed.'); }
+}
+function stripeConnect(){
+  const s=stripeRec();
+  openModal(`<h3>Stripe incoming</h3>
+    <div class="note-line" style="line-height:1.7;margin-bottom:8px">In your Stripe Dashboard: <b>Developers → API keys → Create restricted key</b>. Give it only <b>Balance: Read</b> and <b>Payouts: Read</b>; leave everything else at None. Paste the key here. It can read amounts and dates, nothing else.</div>
+    <div class="field"><label>Restricted key (rk_live_…)</label><input id="m-sk" placeholder="rk_live_..." value="${s.key?'••••••••':''}"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="stripeConnectGo()">Save</button></div>
+    ${s.key?'<div class="row" style="margin-top:6px"><button style="color:var(--belt)" onclick="stripeDisconnect()">Disconnect Stripe</button></div>':''}`);
+  setTimeout(()=>{ const el=$('m-sk'); if(el&&!s.key)el.focus(); },50);
+}
+function stripeConnectGo(){
+  const v=$('m-sk').value.trim();
+  if(v&&!/^•/.test(v)){
+    if(!/^(rk|sk)_(live|test)_/.test(v)){ toast('That doesn\'t look like a Stripe key.'); return; }
+    stripeRec().key=v; stripeRec().err=''; stripeRec().lastSync=0;
+  }
+  save(); closeModal(); renderHome(); stripeSync(true);
+}
+function stripeDisconnect(){ S.stripe={key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''}; save(); closeModal(); renderHome(); toast('Stripe disconnected.'); }
+
 // ── EXPORT / IMPORT ────────────────────────────────────────────────
 function exportData(){
   // The SimpleFIN access URL is a bank credential — never let it leave in a backup file.
   const copy=JSON.parse(JSON.stringify(S));
   if(copy.bank)copy.bank.url='';
+  if(copy.stripe)copy.stripe.key=''; // Stripe restricted key is a credential too
   const blob=new Blob([JSON.stringify(copy,null,1)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1278,9 +1410,10 @@ function importGo(){
   try{
     const data=JSON.parse($('m-imp').value);
     if(!data.funds||!data.debts)throw new Error('bad');
-    const prevBankUrl=S&&S.bank?S.bank.url:'';
+    const prevBankUrl=S&&S.bank?S.bank.url:'', prevStripeKey=S&&S.stripe?S.stripe.key:'';
     S=data;
     if(prevBankUrl&&!bankRec().url)S.bank.url=prevBankUrl; // backups don't carry the credential
+    if(prevStripeKey&&!stripeRec().key)S.stripe.key=prevStripeKey;
     save(); closeModal(); renderAll(); toast('Backup restored.');
   }catch(e){toast('That doesn\'t look like a valid backup.');}
 }
