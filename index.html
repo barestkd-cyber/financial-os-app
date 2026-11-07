@@ -204,12 +204,14 @@ tr:hover td{background:#fcfbf8;}
 .acct .bal .asof{display:block; font-size:9px; font-weight:500; color:var(--muted);}
 .grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:12px; color:var(--ink);}
 .grp-tot.neg{color:var(--belt);}
-.exp{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
+.exp{display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .exp:last-child{border-bottom:none;}
 .exp:hover{background:#fcfbf8;}
-.exp .l{flex:1; min-width:0;}
-.exp .nm{font-weight:700;}
-.exp .sub{font-size:11px; color:var(--muted); margin-top:2px;}
+.exp .l{flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; white-space:nowrap; overflow:hidden;}
+.exp .dot{width:7px; height:7px; border-radius:50%; flex:none; align-self:center;}
+.exp .nm{font-weight:700; flex:none;}
+.exp .sub{font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; min-width:0;}
+.exp.paid .nm{color:var(--muted); font-weight:600;}
 .exp .m{width:150px; flex:none;}
 .exp .pair{font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right;}
 .exp .pair .in{color:var(--money); font-weight:800;}
@@ -303,8 +305,7 @@ tr:hover td{background:#fcfbf8;}
   <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
   <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
   <div class="tab" data-t="funds" onclick="showTab('funds')">Buckets</div>
-  <div class="tab" data-t="today" onclick="showTab('today')">Today</div>
-  <div class="tab" data-t="monday" onclick="showTab('monday')">Money Monday</div>
+  <div class="tab" data-t="txns" onclick="showTab('txns')">Transactions</div>
   <div class="tab" data-t="debt" onclick="showTab('debt')">Debt</div>
   <div class="tab" data-t="month" onclick="showTab('month')">Month-End</div>
   <div class="tab" data-t="banks" onclick="showTab('banks')">Banks</div>
@@ -398,16 +399,13 @@ tr:hover td{background:#fcfbf8;}
 <!-- DEBT -->
 <div class="page" id="p-debt"><div class="wrap">
   <div class="card">
-    <div class="card-h">Kill list — avalanche order (highest APR first)</div>
-    <div style="overflow-x:auto;"><table>
-      <thead><tr><th>Card</th><th>Status</th><th class="r">Balance</th><th class="r">APR</th><th class="r">Interest/mo</th><th class="r">Min</th><th>Due</th></tr></thead>
-      <tbody id="debt-rows"></tbody>
-    </table></div>
+    <div class="card-h"><span>Payoff order, highest APR first</span><span class="grp-tot neg" id="debt-tot"></span></div>
+    <div class="card-b" style="padding:0 12px" id="debt-rows"></div>
     <div class="card-b" id="debt-summary"></div>
   </div>
   <div class="card">
-    <div class="card-h">Loans (not in avalanche)</div>
-    <div class="card-b" id="loan-rows"></div>
+    <div class="card-h">Loans (not in the payoff order)</div>
+    <div class="card-b" style="padding:0 12px" id="loan-rows"></div>
   </div>
 </div></div>
 
@@ -455,11 +453,18 @@ tr:hover td{background:#fcfbf8;}
     </div>
     <div class="card-b" id="bank-accts"></div>
   </div>
+  <div class="note-line">Read-only sync via SimpleFIN. Balances and new transactions come in together on every sync.</div>
+</div></div>
+
+<!-- TRANSACTIONS -->
+<div class="page" id="p-txns"><div class="wrap">
   <div class="card">
-    <div class="card-h">Transaction inbox <button class="small-btn" onclick="bankPaste()">Paste JSON</button></div>
+    <div class="card-h">Transactions to review
+      <span><button class="small-btn" onclick="bankPaste()">Paste JSON</button> <button class="small-btn" onclick="syncAll(true)">Sync</button></span>
+    </div>
     <div class="card-b" id="bank-inbox"></div>
   </div>
-  <div class="note-line">Read-only sync via SimpleFIN. Log each transaction where it belongs: budget spending, a bill payment, or income. Balances update on sync.</div>
+  <div class="note-line">New transactions arrive with every sync. Log each one where it belongs: budget spending, a bill payment, or income.</div>
 </div></div>
 
 </div><!-- /#app -->
@@ -614,7 +619,7 @@ function showTab(t){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   $('p-'+t).classList.add('active');
   // Stripe is checked with every bank sync (auto on open when the last sync is >6h old, or the Sync button).
-  if((t==='banks'||t==='home')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
+  if((t==='banks'||t==='home'||t==='txns')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
 }
 function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); }
 
@@ -898,11 +903,12 @@ function expRowHTML(grp,b){
   const pair=p.kind==='asneeded'
     ?`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="font-size:10px;color:${k[1]}">as needed</span>`
     :`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="color:#bbb">/</span> <span class="of">${fmt0(p.amt)}</span>`;
-  return `<div class="exp" onclick="billOpen('${grp}',${b.id})">
-    <div class="l"><div class="nm">${esc(b.name)}</div>
-      <div class="sub">${b.due?'Due '+esc(b.due)+' · ':''}${payAcctLabel(b)} · <span class="${payCls}">${b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending'}</span> · <span style="color:${k[1]}">${k[0]}</span></div></div>
+  // One line per expense: type dot, name, then the small details inline (due day, paid from, and
+  // Pending only when the payment method still needs switching). No paid/due/late chip.
+  const sub=[b.due?esc(b.due):'',payAcctLabel(b),b.pay==='pending'?'<span class="t-pending">Pending</span>':''].filter(Boolean).join(' · ');
+  return `<div class="exp ${ms[0]==='paid'?'paid':''}" onclick="billOpen('${grp}',${b.id})" title="${k[0]}">
+    <div class="l"><span class="dot" style="background:${k[1]}"></span><span class="nm">${esc(b.name)}</span><span class="sub">${sub}</span></div>
     <div class="m"><div class="pair">${pair}</div>${p.kind==='asneeded'?'':`<div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div>`}</div>
-    <div class="st"><span class="tag st-${ms[0]}">${ms[0]==='paid'?'Paid':ms[0]==='late'?'Late':'Due'}</span></div>
   </div>`;
 }
 // The monthly spending budget (Budget tab) counts as one Home expense so the monthly
@@ -910,8 +916,8 @@ function expRowHTML(grp,b){
 const budgetTotal=()=>(S.budget||[]).reduce((s,c)=>s+(+c.tgt||0),0);
 function budgetRowHTML(){
   const amt=budgetTotal(), inB=+S.budgetBucket||0, pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
-  return `<div class="exp" onclick="showTab('budget')">
-    <div class="l"><div class="nm">Spending budget</div><div class="sub">Monthly · ${(S.budget||[]).length} categories on the Budget tab · <span style="color:var(--amber)">Average</span></div></div>
+  return `<div class="exp" onclick="showTab('budget')" title="Average">
+    <div class="l"><span class="dot" style="background:var(--amber)"></span><span class="nm">Spending budget</span><span class="sub">${(S.budget||[]).length} categories on the Budget tab</span></div>
     <div class="m"><div class="pair"><span class="in ${inB<0?'neg':''}">${fmt0(inB)}</span> <span style="color:#bbb">/</span> <span class="of">${fmt0(amt)}</span></div><div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div></div>
     <div class="st"><span class="tag st-due">Budget</span></div>
   </div>`;
@@ -1017,21 +1023,21 @@ const ST_LABEL={bills:['Bill card — paid weekly','#1d4f9e'],payoff:['Payoff ta
 function renderDebt(){
   const sorted=[...S.debts].sort((a,b)=>b.apr-a.apr);
   const tgt=avalancheTarget();
+  // Same row style as the Accounts page: name + details on the left, balance owed on the right.
   $('debt-rows').innerHTML=sorted.map(d=>{
     const int=d.bal*(d.apr/100)/12;
     const isT=tgt&&tgt.id===d.id;
     const st=ST_LABEL[d.st]||['',''];
-    return `<tr style="${isT?'background:#fdf2f1;':''}">
-      <td><b>${d.name}</b>${isT?' <span class="tag" style="background:var(--belt);color:#fff">TARGET</span>':''}${d.bal===0?' <span class="tag qs">$0 ✓</span>':''}</td>
-      <td><span style="font-size:11px;color:${st[1]}">${st[0]}</span></td>
-      <td class="r"><span class="link-num" onclick="balModal(${d.id})">${fmt(d.bal)}</span></td>
-      <td class="r">${d.apr}%</td>
-      <td class="r" style="color:${int>0?'var(--belt)':'var(--muted)'}">${int>0?fmt(int):'—'}</td>
-      <td class="r">${d.min>0?fmt0(d.min):'—'}</td>
-      <td style="color:var(--muted)">${d.due}</td></tr>`;
-  }).join('');
+    const sub=[`<span>${d.apr}% APR</span>`,st[0]?`<span style="color:${st[1]}">${st[0]}</span>`:'',d.min>0?`<span>min ${fmt0(d.min)}</span>`:'',d.due?`<span>due ${esc(d.due)}</span>`:''].filter(Boolean).join('');
+    return `<div class="acct" onclick="balModal(${d.id})" style="${isT?'background:#fdf2f1;margin:0 -12px;padding-left:12px;padding-right:12px;':''}">
+      <div><div class="nm">${esc(d.name)}${isT?' <span class="tag" style="background:var(--belt);color:#fff">TARGET</span>':''}${d.bal===0?' <span class="tag qs">$0</span>':''}</div>
+        <div class="sub">${sub}</div></div>
+      <div class="bal ${d.bal>0?'neg':''}">${fmt(d.bal)}${int>0?'<span class="asof">'+fmt(int)+'/mo interest</span>':''}</div>
+    </div>`;
+  }).join('')||'<div class="empty">No cards yet.</div>';
   const totBal=S.debts.reduce((s,d)=>s+d.bal,0);
   const totInt=S.debts.reduce((s,d)=>s+d.bal*(d.apr/100)/12,0);
+  $('debt-tot').textContent=fmt(totBal)+' owed';
   $('h-debt').textContent=fmt0(totBal);
   $('h-int').textContent=fmt(totInt);
   $('h-target').textContent=tgt?tgt.name:'None 🎉';
@@ -1041,15 +1047,15 @@ function renderDebt(){
   let carry=0;
   killers.forEach(d=>{
     months+= (d.bal)/(pool);
-    proj+=`<div style="padding:2px 0">• <b>${d.name}</b> — dead in ~${Math.ceil(months*4.3)} weeks at $${pool}/mo surplus</div>`;
+    proj+=`<div style="padding:2px 0"><b>${esc(d.name)}</b> gone in about ${Math.ceil(months*4.3)} weeks at $${pool}/mo surplus</div>`;
   });
   $('debt-summary').innerHTML=`
-    <div style="font-weight:700;margin-bottom:4px">Total: ${fmt(totBal)} costing ${fmt(totInt)}/month (${fmt(totInt*12)}/yr)</div>
+    <div style="font-weight:700;margin-bottom:4px">Interest: ${fmt(totInt)}/month (${fmt(totInt*12)}/yr)</div>
     ${proj||'<div style="color:var(--money);font-weight:700">All payoff cards at zero. Surplus now fills funds.</div>'}
-    <div class="note-line">Citi's revolving balance gets chipped by the $375 weekly regardless. When a card dies: park one small bill, freeze it in the app — except Credit One, which gets closed ($99/yr fee).</div>`;
-  $('loan-rows').innerHTML=S.loans.map(l=>`<div class="alloc"><span class="amt">${fmt(l.bal)}</span>
-    <div class="what"><div><b>${l.name}</b></div><div class="d">${l.note}</div></div>
-    <button class="small-btn" onclick="loanModal()">Update</button></div>`).join('');
+    <div class="note-line">When a card dies: park one small bill on it and freeze it in the card's app. Credit One gets closed instead (annual fee).</div>`;
+  $('loan-rows').innerHTML=S.loans.map(l=>`<div class="acct" onclick="loanModal()">
+    <div><div class="nm">${esc(l.name)}</div><div class="sub"><span>${esc(l.note||'')}</span></div></div>
+    <div class="bal neg">${fmt(l.bal)}</div></div>`).join('')||'<div class="empty">No loans.</div>';
 }
 function balModal(id){
   const d=S.debts.find(x=>x.id===id);
@@ -1414,29 +1420,26 @@ function treeCard(title,rows,opts){
 }
 // Income card: the Stripe strip (On deck / On the way / Lands in) followed by the hub account itself,
 // so the account income lands in is part of Income rather than a separate section.
-function renderIncoming(hubs,feeds){
+function renderIncoming(hubs){
   const s=stripeRec();
   const hubRows=hubs.map(x=>acctRowHTML(x.a,x.i)).join('');
   const hubTot=hubs.reduce((t,x)=>t+(+x.a.balance||0),0);
-  const feedNote=feeds?`<div class="tree-note">Money Monday, every week: ${feeds}</div>`:'';
   const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
   if(!s.key){
     return `<div class="card"><div class="card-h"><span>Income</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div><div class="card-b" style="padding:0 12px">
       <div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
         <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>
-      ${hubRows}${noHub}${feedNote}</div></div>`;
+      ${hubRows}${noHub}</div></div>`;
   }
-  const hub=hubs.length?hubs[0].a:null;
+  // The hub account row right below the strip is where the payouts land, so no "Lands in" cell. Stripe settings live in + Add Account.
   const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
-  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${hub?fmt(hubTot):''}</span></div>
+  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div>
     <div class="card-b" style="padding:0 12px">${s.err?'<div class="note-line" style="color:var(--amber);padding:8px 0 0">'+esc(s.err)+'</div>':''}
       <div class="inc" style="padding:10px 0;border-bottom:1px solid var(--soft)">
         <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe payouts</div></div>
         <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:''}</div></div>
-        <div class="cell"><div class="lbl">Lands in</div><div class="amt" style="font-size:13px;color:var(--ink)">${hub?esc(acctLabel(hub)):'<span style="color:#bbb">no hub set</span>'}</div></div>
       </div>
-      ${hubRows}${noHub}${feedNote}
-      <div class="note-line" style="padding:6px 0 8px"><span class="link-num" onclick="stripeConnect()">Stripe settings</span></div></div></div>`;
+      ${hubRows}${noHub}</div></div>`;
 }
 function homeView(v){ S.homeView=v; save(); renderHome(); }
 // By-bank view: one card per institution, every visible account under it, net total in the header.
@@ -1465,13 +1468,12 @@ function renderHome(){
   // so nothing nests under a dispatch account. `payer` is kept on the data for when that changes.
   const payoff=vis.filter(x=>x.a.type==='credit');
   const hubName=hubs.length?acctLabel(hubs[0].a):'';
-  const feeds=disp.filter(x=>+x.a.feed>0).map(x=>fmt0(+x.a.feed)+' to '+esc(acctLabel(x.a))).join(' · ');
   if(view==='bank'){
     html+=renderByBank(vis);
   }else{
-    html+=renderIncoming(hubs,feeds);
+    html+=renderIncoming(hubs);
     if(disp.length){
-      html+=treeCard('Dispatch',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})));
+      html+=treeCard('Outgoing',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})));
     }
     if(savings.length)html+=treeCard('Savings & other',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
     if(loans.length)html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
@@ -1540,6 +1542,7 @@ function addAccount(){
     <div class="field"><button class="small-btn primary" style="width:100%;padding:8px" onclick="${linked?'addLinked()':'closeModal();bankConnect()'}">${linked?'Link another bank (SimpleFIN)':'Link a bank (SimpleFIN)'}</button></div>
     <div class="field"><button class="small-btn" style="width:100%;padding:8px" onclick="addManual()">Add a manual account</button></div>
     ${hiddenN?`<div class="field"><button class="small-btn" style="width:100%;padding:8px" onclick="acctUnhideAll()">Show ${hiddenN} hidden account${hiddenN===1?'':'s'}</button></div>`:''}
+    <div class="field"><button class="small-btn" style="width:100%;padding:8px" onclick="closeModal();stripeConnect()">${stripeRec().key?'Stripe settings':'Connect Stripe (incoming payouts)'}</button></div>
     <div class="row"><button onclick="closeModal()">Cancel</button></div>`);
 }
 function acctUnhideAll(){ acctRec().forEach(a=>{ a.hidden=false; }); save(); closeModal(); renderHome(); toast('Hidden accounts restored.'); }
