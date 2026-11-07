@@ -360,7 +360,7 @@ tr:hover td{background:#fcfbf8;}
     <div style="display:flex; gap:6px;"><button class="small-btn primary" onclick="addBill()">+ Add expense</button></div>
   </div>
   <div id="exp-groups"></div>
-  <div class="note-line">Budget = the highest of the last 3 actual payments (your estimate until there are 3). Tap an expense to edit it or log a payment. Released = budget minus what actually got paid this month; that goes to the payoff target.</div>
+  <div class="note-line">Amount = what this expense runs (fixed, or its average). Cap = the most it should ever need set aside. Bucket = what is set aside for it right now; a logged payment comes out of the bucket. Need = what would top the bucket up this month. Tap an expense to edit it or log a payment.</div>
 </div></div>
 
 <!-- DEBT -->
@@ -756,6 +756,22 @@ function billStats(b){
   const budget=last.length>=3?Math.max(...last.map(x=>x.total)):Math.max(est,...last.map(x=>x.total));
   return {acts,last,avg,budget,est,fromActuals:last.length>=3};
 }
+// Expense type and bucket. kind: fixed (same every month) | avg (varies; contributes its
+// average, bucket capped at the highest expected) | asneeded (no regular amount).
+// bucket = money set aside for this expense right now. need = what it would take to top
+// the bucket up this month (display only; how/when money moves is Race's call).
+const KIND={fixed:['Fixed','var(--money)'],avg:['Average','var(--amber)'],asneeded:['As needed','var(--belt)']};
+function billKind(b){ return KIND[b.kind]?b.kind:(+b.hi>0?'avg':'fixed'); }
+function billPlan(b){
+  const st=billStats(b), kind=billKind(b);
+  let amt=0;
+  if(kind==='fixed')amt=st.last.length?st.last[st.last.length-1].total:(+b.cost||0);
+  else if(kind==='avg')amt=st.avg||(+b.cost||0);
+  const cap=kind==='asneeded'?0:Math.max(+b.hi||0,amt);
+  const bucket=+b.bucket||0;
+  const need=kind==='asneeded'?0:Math.max(0,Math.min(amt,cap-bucket));
+  return {kind,amt,cap,bucket,need,st};
+}
 function dueDay(b){ const m=String(b.due||'').match(/\d{1,2}/); return m?+m[0]:0; }
 function billMonthState(b){
   const paid=mTotal(b.act||{},actKey(b,ymNow()));
@@ -769,30 +785,32 @@ function payAcctLabel(b){
   const t=ACCT_TAG[b.acct]; return t?t[1]:esc(b.acct||'');
 }
 function renderBills(){
-  let html='', grand=0, paidTot=0, released=0;
+  let html='', needTot=0, bucketTot=0, paidTot=0;
   EXP_GROUPS.forEach(([grp,title])=>{
     const list=S.bills[grp]||[];
-    const sub=list.reduce((s,b)=>s+billStats(b).budget,0); grand+=sub;
+    let sub=0;
     const rows=list.map(b=>{
-      const st=billStats(b), ms=billMonthState(b);
-      if(ms[2]>0){ paidTot+=ms[2]; released+=Math.max(0,st.budget-ms[2]); }
+      const p=billPlan(b), ms=billMonthState(b);
+      sub+=p.need; bucketTot+=p.bucket; if(ms[2]>0)paidTot+=ms[2];
       const payCls=b.pay==='auto'?'t-auto':b.pay==='manual'?'t-manual':'t-pending';
-      const last3=st.last.map(x=>fmt0(x.total)).join(' · ')||'<span style="color:#bbb">none yet</span>';
+      const k=KIND[p.kind];
       return `<tr onclick="billOpen('${grp}',${b.id})" style="cursor:pointer">
         <td><b>${esc(b.name)}</b><div style="font-size:10px;color:var(--muted)">${payAcctLabel(b)} · <span class="${payCls}">${b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending'}</span></div></td>
         <td style="color:var(--muted)">${esc(b.due||'')}</td>
-        <td class="r"><b>${fmt0(st.budget)}</b>${st.fromActuals?'':'<div style="font-size:9px;color:var(--amber)">estimate</div>'}</td>
-        <td class="r" style="color:var(--muted)">${st.avg?fmt0(st.avg):''}</td>
-        <td class="r" style="font-size:11px;color:var(--muted)">${last3}</td>
+        <td class="r"><b style="color:${k[1]}">${p.kind==='asneeded'?'':fmt0(p.amt)}</b><div style="font-size:9px;color:${k[1]}">${k[0]}</div></td>
+        <td class="r" style="color:var(--muted)">${p.cap?fmt0(p.cap):''}</td>
+        <td class="r" style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt0(p.bucket)}</td>
+        <td class="r"><b>${p.need?fmt0(p.need):'<span style="color:#bbb">0</span>'}</b></td>
         <td><span class="tag st-${ms[0]}">${ms[1]}</span></td></tr>`;
-    }).join('')||'<tr><td colspan="6" class="empty">Nothing here yet.</td></tr>';
-    html+=`<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot">${fmt0(sub)}/mo</span></div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Expense</th><th>Due</th><th class="r">Budget</th><th class="r">Avg</th><th class="r">Last 3</th><th>This month</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    }).join('')||'<tr><td colspan="7" class="empty">Nothing here yet.</td></tr>';
+    needTot+=sub;
+    html+=`<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot">need ${fmt0(sub)}</span></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Expense</th><th>Due</th><th class="r">Amount</th><th class="r">Cap</th><th class="r">Bucket</th><th class="r">Need</th><th>This month</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   });
   html+=`<div class="card"><div class="card-b"><div class="inc">
-    <div class="cell"><div class="lbl">Fund per month</div><div class="amt" style="color:var(--ink)">${fmt0(grand)}</div></div>
+    <div class="cell"><div class="lbl">Needs to move</div><div class="amt" style="color:var(--ink)">${fmt0(needTot)}</div><div class="when">to top every bucket up this month</div></div>
+    <div class="cell"><div class="lbl">In buckets now</div><div class="amt ${bucketTot?'':'zero'}">${fmt0(bucketTot)}</div></div>
     <div class="cell"><div class="lbl">Paid this month</div><div class="amt ${paidTot?'':'zero'}">${fmt0(paidTot)}</div></div>
-    <div class="cell"><div class="lbl">Released</div><div class="amt ${released?'':'zero'}">${fmt0(released)}</div><div class="when">budget minus actual, to the payoff target</div></div>
   </div></div></div>`;
   $('exp-groups').innerHTML=html;
   const n=EXP_GROUPS.reduce((s,[g])=>s+(S.bills[g]||[]).length,0);
@@ -802,17 +820,21 @@ function billFieldsHTML(b){
   const accts=acctRec().filter(a=>!a.hidden&&a.type!=='loan'); // cash accounts and cards can pay an expense
   const grpOpts=EXP_GROUPS.map(([g,t])=>`<option value="${g}" ${b.grp===g?'selected':''}>${t}</option>`).join('');
   const acctOpts='<option value="">Not set</option>'+accts.map(a=>`<option value="${esc(a.id)}" ${a.id===b.payAcct?'selected':''}>${esc(acctLabel(a))}</option>`).join('');
+  const kind=billKind(b);
+  const kindOpts=Object.entries(KIND).map(([k,v])=>`<option value="${k}" ${k===kind?'selected':''}>${v[0]}</option>`).join('');
   return `<div class="field"><label>Name</label><input id="m-name" value="${esc(b.name||'')}"></div>
     <div class="field"><label>Group</label><select id="m-grp">${grpOpts}</select></div>
+    <div class="field"><label>Type</label><select id="m-kind">${kindOpts}</select></div>
+    <div class="field"><label>Bucket (set aside for this right now)</label><input type="number" id="m-bucket" step="0.01" value="${+b.bucket||''}"></div>
     <div class="field"><label>Due (e.g. 15th, Biweekly)</label><input id="m-due" value="${esc(b.due||'')}"></div>
     <div class="field"><label>Paid from</label><select id="m-payacct">${acctOpts}</select></div>
     <div class="field"><label>Payment</label><select id="m-pay-t">
       <option value="auto" ${b.pay==='auto'?'selected':''}>Autopay</option><option value="manual" ${b.pay==='manual'?'selected':''}>Manual</option><option value="pending" ${b.pay==='pending'?'selected':''}>Pending switch</option></select></div>
-    <div class="field"><label>Estimate (used until 3 real payments)</label><div style="display:flex;gap:6px"><input type="number" id="m-cost" step="0.01" placeholder="typical" value="${+b.cost||''}"><input type="number" id="m-hi" step="0.01" placeholder="high" value="${+b.hi||''}"></div></div>`;
+    <div class="field"><label>Typical amount (until real payments exist) · Cap (highest expected)</label><div style="display:flex;gap:6px"><input type="number" id="m-cost" step="0.01" placeholder="typical" value="${+b.cost||''}"><input type="number" id="m-hi" step="0.01" placeholder="cap" value="${+b.hi||''}"></div></div>`;
 }
 function billRead(){
-  return {name:$('m-name').value.trim(),grp:$('m-grp').value,due:$('m-due').value.trim(),payAcct:$('m-payacct').value,
-    pay:$('m-pay-t').value,cost:parseFloat($('m-cost').value)||0,hi:parseFloat($('m-hi').value)||0};
+  return {name:$('m-name').value.trim(),grp:$('m-grp').value,due:$('m-due').value.trim(),payAcct:$('m-payacct').value,kind:$('m-kind').value,
+    bucket:parseFloat($('m-bucket').value)||0,pay:$('m-pay-t').value,cost:parseFloat($('m-cost').value)||0,hi:parseFloat($('m-hi').value)||0};
 }
 function billOpen(grp,id){
   const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
@@ -821,8 +843,9 @@ function billOpen(grp,id){
     const arr=Array.isArray(b.act[x.key])?b.act[x.key]:[+b.act[x.key]];
     return `<div class="pay-item"><span>${x.ym}</span><span>${arr.map((v,i)=>fmt(v)+` <button class="del" onclick="billPayDel('${grp}',${id},'${x.key}',${i})">×</button>`).join(' ')}</span></div>`;
   }).join('');
+  const p=billPlan(b), last3=st.last.map(x=>fmt0(x.total)).join(' · ');
   openModal(`<h3>${esc(b.name)}</h3>
-    <div class="note-line" style="margin-bottom:8px">Budget <b>${fmt0(st.budget)}</b>${st.fromActuals?' from the last 3 payments':' (estimate)'}${st.avg?' · avg '+fmt0(st.avg):''}</div>
+    <div class="note-line" style="margin-bottom:8px"><span style="color:${KIND[p.kind][1]};font-weight:700">${KIND[p.kind][0]}</span>${p.kind!=='asneeded'?' · amount '+fmt0(p.amt)+' · cap '+fmt0(p.cap):''} · bucket ${fmt0(p.bucket)}${p.need?' · need '+fmt0(p.need):''}${last3?'<br>Last 3: '+last3+(st.avg?' · avg '+fmt0(st.avg):''):'<br>No real payments yet; using the typical amount.'}</div>
     <div class="field"><label>Log a payment</label><div style="display:flex;gap:6px"><input type="month" id="m-pay-ym" value="${ymNow()}" style="flex:1"><input type="number" id="m-pay" step="0.01" placeholder="amount" style="flex:1" onkeydown="if(event.key==='Enter')billPayAdd('${grp}',${id})"><button class="small-btn primary" onclick="billPayAdd('${grp}',${id})">Log</button></div></div>
     <div class="pay-list">${hist||'<div class="empty">No payments logged yet.</div>'}</div>
     ${billFieldsHTML(Object.assign({grp},b))}
@@ -836,18 +859,21 @@ function billPayAdd(grp,id){
   const k=actKey(b,ym);
   if(typeof b.act[k]==='number')b.act[k]=[b.act[k]];
   if(!b.act[k])b.act[k]=[];
-  b.act[k].push(v); save(); renderBills(); billOpen(grp,id); toast('Payment logged.');
+  b.act[k].push(v); b.bucket=(+b.bucket||0)-v; // the bill comes out of its bucket
+  save(); renderBills(); billOpen(grp,id); toast('Payment logged.');
 }
 function billPayDel(grp,id,key,i){
   const b=S.bills[grp].find(x=>x.id===id); if(!b||!b.act||!b.act[key])return;
   if(typeof b.act[key]==='number')b.act[key]=[b.act[key]];
+  const v=+b.act[key][i]||0;
   b.act[key].splice(i,1); if(!b.act[key].length)delete b.act[key];
+  b.bucket=(+b.bucket||0)+v;
   save(); renderBills(); billOpen(grp,id);
 }
 function billSaveGo(grp,id){
   const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
   const f=billRead(); if(!f.name)return;
-  Object.assign(b,{name:f.name,due:f.due,payAcct:f.payAcct,pay:f.pay,cost:f.cost,hi:f.hi});
+  Object.assign(b,{name:f.name,due:f.due,payAcct:f.payAcct,kind:f.kind,bucket:f.bucket,pay:f.pay,cost:f.cost,hi:f.hi});
   if(f.grp!==grp){ S.bills[grp]=S.bills[grp].filter(x=>x.id!==id); S.bills[f.grp].push(b); }
   save(); closeModal(); renderBills(); toast('Saved.');
 }
@@ -858,7 +884,7 @@ function addBill(){
 }
 function addBillGo(){
   const f=billRead(); if(!f.name)return;
-  S.bills[f.grp].push({id:Date.now(),name:f.name,due:f.due,cost:f.cost,hi:f.hi,acct:'',payAcct:f.payAcct,pay:f.pay,act:{}});
+  S.bills[f.grp].push({id:Date.now(),name:f.name,due:f.due,cost:f.cost,hi:f.hi,acct:'',payAcct:f.payAcct,kind:f.kind,bucket:f.bucket,pay:f.pay,act:{}});
   save(); closeModal(); renderBills();
 }
 function delBill(grp,id){
