@@ -201,6 +201,30 @@ tr:hover td{background:#fcfbf8;}
 .acct .bal .asof{display:block; font-size:9px; font-weight:500; color:var(--muted);}
 .grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:12px; color:var(--ink);}
 .grp-tot.neg{color:var(--belt);}
+.exp{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
+.exp:last-child{border-bottom:none;}
+.exp:hover{background:#fcfbf8;}
+.exp .l{flex:1; min-width:0;}
+.exp .nm{font-weight:700;}
+.exp .sub{font-size:11px; color:var(--muted); margin-top:2px;}
+.exp .m{width:150px; flex:none;}
+.exp .pair{font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right;}
+.exp .pair .in{color:var(--money); font-weight:800;}
+.exp .pair .in.neg{color:var(--belt);}
+.exp .pair .of{color:var(--ink); font-weight:700;}
+.exp .bar{height:5px; background:var(--soft); border-radius:3px; overflow:hidden; margin-top:4px;}
+.exp .fill{height:5px; border-radius:3px; background:var(--money);}
+.exp .fill.short{background:var(--amber);}
+.exp .st{width:78px; flex:none; text-align:right;}
+.tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px;}
+.tile{background:var(--panel); border:1px solid var(--rule); border-radius:6px; padding:8px 10px;}
+.tile .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
+.tile .big{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums;}
+.tile .in{font-size:11px; color:var(--money); font-weight:600; font-variant-numeric:tabular-nums;}
+.fund .next{font-size:10px; color:var(--muted); margin-top:5px;}
+.fund .next b{color:var(--ink);}
+.fund.behind{border-color:var(--belt);}
+.fund.behind .name::after{content:'BEHIND'; font-size:8px; color:var(--belt); font-weight:800; letter-spacing:1px;}
 .tag.st-paid{background:#e7f3ec; color:var(--money);}
 .tag.st-due{background:var(--soft); color:#777;}
 .tag.st-late{background:#fdecea; color:var(--belt);}
@@ -275,7 +299,7 @@ tr:hover td{background:#fcfbf8;}
   <div class="tab active" data-t="home" onclick="showTab('home')">Accounts</div>
   <div class="tab" data-t="today" onclick="showTab('today')">Today</div>
   <div class="tab" data-t="monday" onclick="showTab('monday')">Money Monday</div>
-  <div class="tab" data-t="funds" onclick="showTab('funds')">Funds</div>
+  <div class="tab" data-t="funds" onclick="showTab('funds')">Buckets</div>
   <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
   <div class="tab" data-t="debt" onclick="showTab('debt')">Debt</div>
   <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
@@ -348,7 +372,10 @@ tr:hover td{background:#fcfbf8;}
 
 <!-- FUNDS -->
 <div class="page" id="p-funds"><div class="wrap">
-  <div class="note-line" style="margin-bottom:10px;">Every purchase has a fund. If the fund is empty, the answer is no — not "check the account."</div>
+  <div class="note-line" style="margin-bottom:10px;">Every purchase has a bucket. If the bucket is empty, the answer is no, not "check the account."</div>
+  <div class="sec-lbl" style="margin-top:0">Expense buckets</div>
+  <div class="fund-grid" id="bucket-grid"></div>
+  <div class="sec-lbl">Funds</div>
   <div class="fund-grid" id="fund-grid"></div>
   <div style="margin-top:12px;"><button class="small-btn" onclick="addFund()">+ New fund</button></div>
 </div></div>
@@ -359,8 +386,9 @@ tr:hover td{background:#fcfbf8;}
     <div><div class="home-q">What does it cost to run everything?</div><div class="home-sub" id="exp-sub"></div></div>
     <div style="display:flex; gap:6px;"><button class="small-btn primary" onclick="addBill()">+ Add expense</button></div>
   </div>
+  <div class="tiles" id="exp-tiles"></div>
   <div id="exp-groups"></div>
-  <div class="note-line">Amount = what this expense runs (fixed, or its average). Cap = the most it should ever need set aside. Bucket = what is set aside for it right now; a logged payment comes out of the bucket. Need = what would top the bucket up this month. Tap an expense to edit it or log a payment.</div>
+  <div class="note-line">Green = what is in the bucket for that expense right now. Black = what the expense runs (fixed, or its average). A logged payment comes out of the bucket. Tap an expense to edit it or log a payment. The Buckets tab has the fuller view.</div>
 </div></div>
 
 <!-- DEBT -->
@@ -675,7 +703,53 @@ function renderWkHistory(){
 }
 
 // ── FUNDS ──────────────────────────────────────────────────────────
+// Buckets page: one card per expense (bucket vs cap, next Monday's contribution, behind flag),
+// then the standalone funds. "Behind" = the bucket plus the Mondays left before the due day
+// would not cover the amount. Display only; nothing here moves money on its own.
+function nextMonday(from){ const d=new Date(from); d.setHours(0,0,0,0); d.setDate(d.getDate()+((8-d.getDay())%7||7)); return d; }
+function bucketPlan(b){
+  const p=billPlan(b); if(p.kind==='asneeded')return Object.assign(p,{weekly:0,behind:false,mondays:0});
+  const weekly=p.amt*12/52, today=new Date(), dd=dueDay(b);
+  let mondays=0, behind=false;
+  if(dd){
+    let due=new Date(today.getFullYear(),today.getMonth(),dd); if(due<today)due=new Date(today.getFullYear(),today.getMonth()+1,dd);
+    for(let d=nextMonday(today); d<=due; d.setDate(d.getDate()+7))mondays++;
+    behind=p.bucket+weekly*mondays<p.amt-0.005&&mTotal(b.act||{},actKey(b,ymNow()))<=0;
+  }
+  return Object.assign(p,{weekly,behind,mondays});
+}
+function bucketCardHTML(grp,b){
+  const p=bucketPlan(b), k=KIND[p.kind];
+  const pct=p.cap>0?Math.max(0,Math.min(100,p.bucket/p.cap*100)):0, full=p.cap>0&&p.bucket>=p.cap;
+  const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  return `<div class="fund ${full?'full':''} ${p.behind?'behind':''}">
+    <div class="name"><span>${esc(b.name)}</span></div>
+    <div class="nums"><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt(p.bucket)}</b>${p.cap?' of '+fmt0(p.cap):''} <span style="color:${k[1]};font-size:10px">${k[0]}</span></div>
+    ${p.cap?`<div class="bar"><div class="fill" style="width:${pct}%"></div></div>`:''}
+    <div class="next">${p.kind==='asneeded'?'Put money in when you decide to.':`Next: <b>${fmt0(p.weekly)}</b> on ${mon}${p.need?' · need '+fmt0(p.need)+' this month':' · topped up'}${b.due?' · due '+esc(b.due):''}`}</div>
+    <div class="acts">
+      <button class="small-btn green" onclick="bucketMove('${grp}',${b.id},1)">Add</button>
+      <button class="small-btn" onclick="bucketMove('${grp}',${b.id},-1)">Take</button>
+      <button class="small-btn" style="margin-left:auto" onclick="billOpen('${grp}',${b.id})">Edit</button>
+    </div>
+  </div>`;
+}
+function bucketMove(grp,id,dir){
+  const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
+  openModal(`<h3>${dir>0?'Add to':'Take from'} ${esc(b.name)} bucket</h3>
+    <div class="field"><label>Amount</label><input type="number" id="m-amt" step="0.01"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="bucketMoveGo('${grp}',${id},${dir})">${dir>0?'Add':'Take'}</button></div>`);
+  setTimeout(()=>$('m-amt').focus(),50);
+}
+function bucketMoveGo(grp,id,dir){
+  const v=parseFloat($('m-amt').value); if(isNaN(v)||v<=0)return;
+  const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
+  b.bucket=(+b.bucket||0)+dir*v;
+  save(); closeModal(); renderFunds(); renderBills(); toast(b.name+' bucket updated.');
+}
 function renderFunds(){
+  const cards=EXP_GROUPS.flatMap(([grp])=>(S.bills[grp]||[]).map(b=>bucketCardHTML(grp,b)));
+  $('bucket-grid').innerHTML=cards.join('')||'<div class="empty">No expenses yet. Add them on the Expenses tab.</div>';
   $('fund-grid').innerHTML=S.funds.map(f=>{
     const pct=f.tgt>0?Math.min(100,f.cur/f.tgt*100):0;
     const full=f.tgt>0&&f.cur>=f.tgt;
@@ -784,35 +858,33 @@ function payAcctLabel(b){
   if(b.payAcct){ const a=acctRec().find(x=>x.id===b.payAcct); if(a)return esc(acctLabel(a)); }
   const t=ACCT_TAG[b.acct]; return t?t[1]:esc(b.acct||'');
 }
+function expRowHTML(grp,b){
+  const p=billPlan(b), ms=billMonthState(b), k=KIND[p.kind];
+  const payCls=b.pay==='auto'?'t-auto':b.pay==='manual'?'t-manual':'t-pending';
+  const pct=p.amt>0?Math.max(0,Math.min(100,p.bucket/p.amt*100)):0;
+  const pair=p.kind==='asneeded'
+    ?`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="font-size:10px;color:${k[1]}">as needed</span>`
+    :`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="color:#bbb">/</span> <span class="of">${fmt0(p.amt)}</span>`;
+  return `<div class="exp" onclick="billOpen('${grp}',${b.id})">
+    <div class="l"><div class="nm">${esc(b.name)}</div>
+      <div class="sub">${b.due?'Due '+esc(b.due)+' · ':''}${payAcctLabel(b)} · <span class="${payCls}">${b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending'}</span> · <span style="color:${k[1]}">${k[0]}</span></div></div>
+    <div class="m"><div class="pair">${pair}</div>${p.kind==='asneeded'?'':`<div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div>`}</div>
+    <div class="st"><span class="tag st-${ms[0]}">${ms[0]==='paid'?'Paid':ms[0]==='late'?'Late':'Due'}</span></div>
+  </div>`;
+}
 function renderBills(){
-  let html='', needTot=0, bucketTot=0, paidTot=0;
+  let html='', tiles='', allIn=0, allAmt=0;
   EXP_GROUPS.forEach(([grp,title])=>{
     const list=S.bills[grp]||[];
-    let sub=0;
-    const rows=list.map(b=>{
-      const p=billPlan(b), ms=billMonthState(b);
-      sub+=p.need; bucketTot+=p.bucket; if(ms[2]>0)paidTot+=ms[2];
-      const payCls=b.pay==='auto'?'t-auto':b.pay==='manual'?'t-manual':'t-pending';
-      const k=KIND[p.kind];
-      return `<tr onclick="billOpen('${grp}',${b.id})" style="cursor:pointer">
-        <td><b>${esc(b.name)}</b><div style="font-size:10px;color:var(--muted)">${payAcctLabel(b)} · <span class="${payCls}">${b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending'}</span></div></td>
-        <td style="color:var(--muted)">${esc(b.due||'')}</td>
-        <td class="r"><b style="color:${k[1]}">${p.kind==='asneeded'?'':fmt0(p.amt)}</b><div style="font-size:9px;color:${k[1]}">${k[0]}</div></td>
-        <td class="r" style="color:var(--muted)">${p.cap?fmt0(p.cap):''}</td>
-        <td class="r" style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt0(p.bucket)}</td>
-        <td class="r"><b>${p.need?fmt0(p.need):'<span style="color:#bbb">0</span>'}</b></td>
-        <td><span class="tag st-${ms[0]}">${ms[1]}</span></td></tr>`;
-    }).join('')||'<tr><td colspan="7" class="empty">Nothing here yet.</td></tr>';
-    needTot+=sub;
-    html+=`<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot">need ${fmt0(sub)}</span></div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Expense</th><th>Due</th><th class="r">Amount</th><th class="r">Cap</th><th class="r">Bucket</th><th class="r">Need</th><th>This month</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const amt=list.reduce((s,b)=>s+billPlan(b).amt,0), inB=list.reduce((s,b)=>s+Math.max(0,+b.bucket||0),0);
+    allAmt+=amt; allIn+=inB;
+    tiles+=`<div class="tile"><div class="lbl">${title}</div><div class="big">${fmt0(amt)}</div><div class="in">${fmt0(inB)} of ${fmt0(amt)}</div></div>`;
+    html+=`<div class="card"><div class="card-h"><span>${title} · ${fmt0(amt)} / month</span><span class="grp-tot" style="color:var(--money)">${fmt0(inB)} of ${fmt0(amt)}</span></div>
+      <div class="card-b" style="padding:0 12px">${list.map(b=>expRowHTML(grp,b)).join('')||'<div class="empty">Nothing here yet.</div>'}</div></div>`;
   });
-  html+=`<div class="card"><div class="card-b"><div class="inc">
-    <div class="cell"><div class="lbl">Needs to move</div><div class="amt" style="color:var(--ink)">${fmt0(needTot)}</div><div class="when">to top every bucket up this month</div></div>
-    <div class="cell"><div class="lbl">In buckets now</div><div class="amt ${bucketTot?'':'zero'}">${fmt0(bucketTot)}</div></div>
-    <div class="cell"><div class="lbl">Paid this month</div><div class="amt ${paidTot?'':'zero'}">${fmt0(paidTot)}</div></div>
-  </div></div></div>`;
+  $('exp-tiles').innerHTML=tiles+`<div class="tile"><div class="lbl">Monthly total</div><div class="big">${fmt0(allAmt)}</div><div class="in">${fmt0(allIn)} of ${fmt0(allAmt)}</div></div>`;
   $('exp-groups').innerHTML=html;
+  renderFunds(); // the Buckets page mirrors the same data
   const n=EXP_GROUPS.reduce((s,[g])=>s+(S.bills[g]||[]).length,0);
   $('exp-sub').textContent=n+' expense'+(n===1?'':'s')+' · '+MNAMES[new Date().getMonth()]+' '+new Date().getFullYear();
 }
