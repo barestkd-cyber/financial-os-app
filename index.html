@@ -1192,8 +1192,13 @@ function acctStatus(a){
 }
 function acctRowHTML(a,i,extra){
   const st=acctStatus(a), bal=+a.balance||0, debt=isDebtType(a.type);
-  // SimpleFIN's available-balance for cards is available credit; sign varies by bank.
-  const avail=a.type==='credit'&&a.source==='synced'&&a.avail!==undefined&&a.avail!==null&&!isNaN(+a.avail)?fmt0(Math.abs(+a.avail))+' available':'';
+  // Available credit: from the user-entered limit when set (limit minus owed), else the bank's
+  // available-balance when it's non-zero (some banks send 0 for "not reported"; sign varies).
+  let avail='';
+  if(a.type==='credit'){
+    if(+a.limit>0)avail=fmt0(Math.max(0,+a.limit-Math.abs(bal)))+' available';
+    else if(a.source==='synced'&&Math.abs(+a.avail||0)>0)avail=fmt0(Math.abs(+a.avail))+' available';
+  }
   const sub2=[debt&&bal<0?'owed':'',avail,a.asOf?'as of '+new Date(a.asOf*1000).toLocaleDateString():''].filter(Boolean).join(' · ');
   const x=extra||{};
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
@@ -1302,7 +1307,8 @@ function acctOpen(i){
     ${synced?'':`<div class="field"><label>Institution</label><input id="m-inst" value="${esc(a.inst)}"></div>`}
     <div class="field"><label>Type</label><select id="m-type" onchange="acctBalLabel()">${acctTypeOpts(a.type)}</select></div>
     ${synced?'':`<div class="field"><label id="m-bal-l">${isDebtType(a.type)?'Amount owed':'Current balance'}</label><input type="number" id="m-bal" step="0.01" value="${Math.abs(bal)}"></div>`}
-    ${a.type==='credit'?`<div class="field"><label>Paid from</label><select id="m-payer"><option value="">Nobody (payoff target)</option>${acctRec().filter(d=>d.role==='dispatch'&&!d.hidden).map(d=>`<option value="${esc(d.id)}" ${d.id===a.payer?'selected':''}>${esc(acctLabel(d))}</option>`).join('')}</select></div>`:
+    ${a.type==='credit'?`<div class="field"><label>Credit limit</label><input type="number" id="m-limit" step="1" value="${+a.limit||''}" placeholder="for available credit"></div>
+      <div class="field"><label>Paid from</label><select id="m-payer"><option value="">Nobody (payoff target)</option>${acctRec().filter(d=>d.role==='dispatch'&&!d.hidden).map(d=>`<option value="${esc(d.id)}" ${d.id===a.payer?'selected':''}>${esc(acctLabel(d))}</option>`).join('')}</select></div>`:
       isDebtType(a.type)?'':`<div class="field"><label>Role in the money tree</label><select id="m-role" onchange="acctRoleUI()"><option value="">None (savings / other)</option><option value="hub" ${a.role==='hub'?'selected':''}>Hub (income lands here)</option><option value="dispatch" ${a.role==='dispatch'?'selected':''}>Dispatch (pays bills)</option></select></div>
       <div class="field" id="m-feed-f" style="${a.role==='dispatch'?'':'display:none'}"><label>Weekly transfer in from the hub</label><input type="number" id="m-feed" step="1" value="${+a.feed||''}"></div>`}
     <div class="field"><label>Note</label><input id="m-note" value="${esc(a.note||'')}"></div>
@@ -1322,9 +1328,10 @@ function acctSaveGo(i){
     a.asOf=Math.floor(Date.now()/1000);
   }
   a.type=$('m-type').value; a.note=$('m-note').value;
-  const role=$('m-role'), feed=$('m-feed'), payer=$('m-payer');
+  const role=$('m-role'), feed=$('m-feed'), payer=$('m-payer'), lim=$('m-limit');
   if(role){ a.role=role.value; a.feed=a.role==='dispatch'?(parseFloat(feed.value)||0):0; }
   if(payer){ a.payer=payer.value; }
+  if(lim){ a.limit=parseFloat(lim.value)||0; }
   if(isDebtType(a.type)){ a.role=''; a.feed=0; } else { a.payer=''; }
   save(); closeModal(); renderHome(); toast('Saved.');
 }
