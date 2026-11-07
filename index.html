@@ -191,6 +191,9 @@ tr:hover td{background:#fcfbf8;}
 .home-top{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
 .home-q{font-size:15px; font-weight:800; letter-spacing:.3px;}
 .home-sub{font-size:11px; color:var(--muted); margin-top:2px;}
+.seg{display:inline-flex; border:1px solid var(--rule); border-radius:6px; overflow:hidden; font-size:11px;}
+.seg span{padding:5px 9px; cursor:pointer; color:var(--muted); background:#fff;}
+.seg span.on{background:var(--ink); color:#fff;}
 .acct{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .acct:last-child{border-bottom:none;}
 .acct:hover{background:#fcfbf8;}
@@ -310,8 +313,9 @@ tr:hover td{background:#fcfbf8;}
 <!-- ACCOUNTS OVERVIEW (home) -->
 <div class="page active" id="p-home"><div class="wrap">
   <div class="home-top">
-    <div><div class="home-q">Where is my money right now?</div><div class="home-sub" id="home-sub"></div></div>
-    <div style="display:flex; gap:6px;">
+    <div><div class="home-q">Accounts overview</div><div class="home-sub" id="home-sub"></div></div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <div class="seg" id="home-view"><span data-v="flow" onclick="homeView('flow')">By category</span><span data-v="bank" onclick="homeView('bank')">By bank</span></div>
       <button class="small-btn" id="home-sync-btn" onclick="syncAll(true)">Sync</button>
       <button class="small-btn primary" onclick="addAccount()">+ Add Account</button>
     </div>
@@ -534,6 +538,7 @@ function defaults(){return {
   accounts:[],
   stripe:{key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''},
   budgetBucket:0,
+  homeView:'flow',
 };}
 // localStorage is an offline mirror only. Supabase (table fos_state, one
 // jsonb row per user) is the source of truth. Every save() writes the mirror
@@ -608,8 +613,8 @@ function showTab(t){
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.t===t));
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   $('p-'+t).classList.add('active');
-  if((t==='banks'||t==='home')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)bankSync(false);
-  if(t==='home'&&S&&stripeRec().key&&Date.now()-stripeRec().lastSync>3600*1000)stripeSync(false);
+  // Stripe is checked with every bank sync (auto on open when the last sync is >6h old, or the Sync button).
+  if((t==='banks'||t==='home')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
 }
 function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); }
 
@@ -1389,7 +1394,7 @@ function acctRowHTML(a,i,extra){
     if(+a.limit>0)avail=fmt0(Math.max(0,+a.limit-Math.abs(bal)))+' available';
     else if(a.source==='synced'&&Math.abs(+a.avail||0)>0)avail=fmt0(Math.abs(+a.avail))+' available';
   }
-  const sub2=[debt&&bal<0?'owed':'',avail,a.asOf?'as of '+new Date(a.asOf*1000).toLocaleDateString():''].filter(Boolean).join(' · ');
+  const sub2=[debt&&bal<0?'owed':'',avail].filter(Boolean).join(' · ');
   const x=extra||{};
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
     <div><div class="nm">${esc(a.nick||a.name)}</div>
@@ -1403,27 +1408,43 @@ function acctRowHTML(a,i,extra){
 function acctLabel(a){ return a?(a.nick||a.name):''; }
 function treeCard(title,rows,opts){
   const o=opts||{}, tot=rows.reduce((s,x)=>s+(+x.a.balance||0),0);
-  const totTxt=o.debt?fmt(Math.abs(tot))+(tot<0?' owed':''):fmt(tot);
+  const totTxt=o.debt?fmt(Math.abs(tot))+(tot<0?' owed':''):(tot<0?'-':'')+fmt(Math.abs(tot));
   return `<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
     <div class="card-b" style="padding:0 12px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
 }
-function renderIncoming(){
+// Income card: the Stripe strip (On deck / On the way / Lands in) followed by the hub account itself,
+// so the account income lands in is part of Income rather than a separate section.
+function renderIncoming(hubs,feeds){
   const s=stripeRec();
+  const hubRows=hubs.map(x=>acctRowHTML(x.a,x.i)).join('');
+  const hubTot=hubs.reduce((t,x)=>t+(+x.a.balance||0),0);
+  const feedNote=feeds?`<div class="tree-note">Money Monday, every week: ${feeds}</div>`:'';
+  const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
   if(!s.key){
-    return `<div class="card"><div class="card-h"><span>Incoming</span></div><div class="card-b">
-      <div class="note-line">Show money that is on its way from Stripe before it lands in the bank.</div>
-      <div style="margin-top:8px"><button class="small-btn primary" onclick="stripeConnect()">Connect Stripe</button></div></div></div>`;
+    return `<div class="card"><div class="card-h"><span>Income</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div><div class="card-b" style="padding:0 12px">
+      <div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
+        <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>
+      ${hubRows}${noHub}${feedNote}</div></div>`;
   }
-  const hub=acctRec().find(a=>a.role==='hub'&&!a.hidden);
-  const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'nothing scheduled';
-  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Incoming</span><span class="grp-tot" style="font-weight:500;color:var(--muted)">${s.lastSync?'checked '+new Date(s.lastSync).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):''}</span></div>
-    <div class="card-b">${s.err?'<div class="note-line" style="color:var(--amber);margin:0 0 8px">'+esc(s.err)+'</div>':''}
-      <div class="inc">
-        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">collected, not paid out yet</div></div>
-        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'nothing in transit'}</div></div>
-        <div class="cell"><div class="lbl">Lands in</div><div class="amt" style="font-size:13px;color:var(--ink)">${hub?esc(acctLabel(hub)):'<span style="color:#bbb">no hub set</span>'}</div><div class="when">${hub?'Stripe payouts':'tap an account, set role to Hub'}</div></div>
+  const hub=hubs.length?hubs[0].a:null;
+  const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
+  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${hub?fmt(hubTot):''}</span></div>
+    <div class="card-b" style="padding:0 12px">${s.err?'<div class="note-line" style="color:var(--amber);padding:8px 0 0">'+esc(s.err)+'</div>':''}
+      <div class="inc" style="padding:10px 0;border-bottom:1px solid var(--soft)">
+        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe payouts</div></div>
+        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:''}</div></div>
+        <div class="cell"><div class="lbl">Lands in</div><div class="amt" style="font-size:13px;color:var(--ink)">${hub?esc(acctLabel(hub)):'<span style="color:#bbb">no hub set</span>'}</div></div>
       </div>
-      <div class="note-line" style="margin-top:8px"><span class="link-num" onclick="stripeConnect()">Stripe settings</span></div></div></div>`;
+      ${hubRows}${noHub}${feedNote}
+      <div class="note-line" style="padding:6px 0 8px"><span class="link-num" onclick="stripeConnect()">Stripe settings</span></div></div></div>`;
+}
+function homeView(v){ S.homeView=v; save(); renderHome(); }
+// By-bank view: one card per institution, every visible account under it, net total in the header.
+function renderByBank(vis){
+  const groups=new Map();
+  vis.forEach(x=>{ const k=x.a.inst||'Other'; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(x); });
+  const names=[...groups.keys()].sort((a,b)=>a==='Other'?1:b==='Other'?-1:a.localeCompare(b));
+  return names.map(k=>treeCard(esc(k),groups.get(k).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})))).join('');
 }
 function renderHome(){
   const reg=acctRec(), b=bankRec();
@@ -1433,52 +1454,32 @@ function renderHome(){
     html+=`<div class="card attn-box"><div class="card-b">${b.lastErrors.map(esc).join('<br>')}
       <div class="note-line">Fix the connection at bridge.simplefin.org, then Sync.</div></div></div>`;
   }
-  html+='<div class="sec-lbl">Income</div>'+renderIncoming();
-  if(!vis.length){
-    html+=`<div class="card"><div class="card-b"><div class="note-line">No accounts yet. Add your accounts to see where your money is.</div>
-      <div style="margin-top:8px"><button class="small-btn primary" onclick="addAccount()">+ Add Account</button></div></div></div>`;
-    $('home-groups').innerHTML=html; $('home-sub').textContent=''; return;
-  }
-  const byId={}; vis.forEach(x=>{ byId[x.a.id]=x; });
+  const view=S.homeView==='bank'?'bank':'flow';
+  document.querySelectorAll('#home-view span').forEach(el=>el.classList.toggle('on',el.dataset.v===view));
   const cash=x=>!isDebtType(x.a.type);
   const hubs=vis.filter(x=>cash(x)&&x.a.role==='hub');
   const disp=vis.filter(x=>cash(x)&&x.a.role==='dispatch');
-  const dispIds=new Set(disp.map(x=>x.a.id));
-  const paid=vis.filter(x=>x.a.type==='credit'&&x.a.payer&&dispIds.has(x.a.payer));
   const savings=vis.filter(x=>cash(x)&&x.a.role!=='hub'&&x.a.role!=='dispatch');
   const loans=vis.filter(x=>x.a.type==='loan');
-  const payoff=vis.filter(x=>x.a.type==='credit'&&!(x.a.payer&&dispIds.has(x.a.payer)));
+  // Every card is a payoff target for now (Race, 2026-11-06): none are being used to pay bills,
+  // so nothing nests under a dispatch account. `payer` is kept on the data for when that changes.
+  const payoff=vis.filter(x=>x.a.type==='credit');
   const hubName=hubs.length?acctLabel(hubs[0].a):'';
-  // Hub
-  html+='<div class="sec-lbl">Hub</div>';
-  if(hubs.length){
-    const feeds=disp.filter(x=>+x.a.feed>0).map(x=>fmt0(+x.a.feed)+' to '+esc(acctLabel(x.a))).join(' · ');
-    html+=treeCard('Income lands here',hubs.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),
-      {after:feeds?`<div class="tree-note">Money Monday, every week: ${feeds}</div>`:''});
+  const feeds=disp.filter(x=>+x.a.feed>0).map(x=>fmt0(+x.a.feed)+' to '+esc(acctLabel(x.a))).join(' · ');
+  if(view==='bank'){
+    html+=renderByBank(vis);
   }else{
-    html+=`<div class="card"><div class="card-b"><div class="note-line">No hub yet. Tap the account your income lands in and set its role to Hub.</div></div></div>`;
+    html+=renderIncoming(hubs,feeds);
+    if(disp.length){
+      html+=treeCard('Dispatch',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})));
+    }
+    if(savings.length)html+=treeCard('Savings & other',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
+    if(loans.length)html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
+    if(payoff.length)html+=treeCard('Debt payoff targets',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
   }
-  // Dispatch accounts, each with the cards it pays nested under it
-  if(disp.length){
-    html+='<div class="sec-lbl">Dispatch</div>';
-    const rows=[];
-    disp.forEach(x=>{
-      rows.push({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})});
-      paid.filter(c=>c.a.payer===x.a.id).forEach(c=>rows.push({a:{balance:0},html:acctRowHTML(c.a,c.i,{nest:true,flow:'paid from '+acctLabel(x.a)})}));
-    });
-    html+=treeCard('Pays the bills',rows);
-  }
-  if(savings.length){
-    html+='<div class="sec-lbl">Savings & other</div>';
-    html+=treeCard('Reserves and vaults',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
-  }
-  if(loans.length){
-    html+='<div class="sec-lbl">Loans</div>';
-    html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
-  }
-  if(payoff.length){
-    html+='<div class="sec-lbl">Debt payoff targets</div>';
-    html+=treeCard('No new charges',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
+  if(!vis.length){
+    html+=`<div class="card"><div class="card-b"><div class="note-line">No accounts yet. Add your accounts to see where your money is.</div>
+      <div style="margin-top:8px"><button class="small-btn primary" onclick="addAccount()">+ Add Account</button></div></div></div>`;
   }
   $('home-groups').innerHTML=html;
   const n=vis.length, sn=vis.filter(x=>x.a.source==='synced').length;
