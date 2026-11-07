@@ -1187,6 +1187,7 @@ function savePL(){
 function bankRec(){
   if(!S.bank)S.bank={url:'',lastSync:0,accounts:[],inbox:[],seen:{}};
   if(!S.bank.seen)S.bank.seen={};
+  if(!S.bank.done)S.bank.done={};
   if(!S.bank.inbox)S.bank.inbox=[];
   if(!S.bank.accounts)S.bank.accounts=[];
   return S.bank;
@@ -1207,7 +1208,8 @@ async function bankSync(manual){
     const now=Math.floor(Date.now()/1000);
     let start=b.lastSync?Math.floor(b.lastSync/1000)-7*86400:now-30*86400;
     if(now-start>89*86400)start=now-89*86400;
-    const res=await fetch(c.base+'/accounts?start-date='+start,{headers:{Authorization:'Basic '+c.auth}});
+    // pending=1: include transactions the bank has not posted yet, so today's swipes show up the same day.
+    const res=await fetch(c.base+'/accounts?start-date='+start+'&pending=1',{headers:{Authorization:'Basic '+c.auth}});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
     b.accounts=(data.accounts||[]).map(a=>({id:a.id,org:(a.org&&(a.org.name||a.org.domain))||'',
@@ -1231,15 +1233,27 @@ async function bankSync(manual){
     reg.forEach(r=>{ if(r.source==='synced'&&!incoming.has(r.sfId))r.stale=true; });
     b.lastErrors=(data.errors||[]).map(x=>String(x).slice(0,160)).slice(0,5);
     let added=0;
+    // A pending transaction usually comes back with a different id once it posts. When a posted one
+    // arrives, it replaces the matching pending inbox entry (same account, same amount, within a week),
+    // or is skipped if that pending entry was already logged or dismissed (b.done fingerprints).
+    const twin=(acctId,amt,posted)=>b.inbox.findIndex(x=>x.pending&&x.acctId===acctId&&Math.abs(x.amount-amt)<0.005&&Math.abs((x.posted||0)-(posted||0))<=7*86400);
     (data.accounts||[]).forEach(a=>(a.transactions||[]).forEach(t=>{
       const key=a.id+'|'+t.id;
       if(b.seen[key])return;
       b.seen[key]=t.posted||now;
-      b.inbox.push({acct:a.name,acctId:a.id,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending});
+      const row={acct:a.name,acctId:a.id,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending};
+      if(!row.pending){
+        const fp=a.id+'|'+row.amount.toFixed(2);
+        if(b.done[fp]&&Math.abs(b.done[fp]-(row.posted||now))<=7*86400){ delete b.done[fp]; return; }
+        const j=twin(a.id,row.amount,row.posted);
+        if(j>=0){ b.inbox[j]=row; return; }
+      }
+      b.inbox.push(row);
       added++;
     }));
     const cutoff=now-180*86400;
     for(const k of Object.keys(b.seen)){ if(b.seen[k]<cutoff)delete b.seen[k]; }
+    for(const k of Object.keys(b.done)){ if(b.done[k]<now-30*86400)delete b.done[k]; }
     b.inbox.sort((x,y)=>(y.posted||0)-(x.posted||0));
     if(b.inbox.length>300)b.inbox.length=300;
     b.lastSync=Date.now();
@@ -1320,13 +1334,19 @@ function bankDisconnectGo(){
   acctRec().forEach(a=>{ if(a.source==='synced')a.stale=true; }); // keep the accounts; they re-match by id on reconnect
   save(); closeModal(); renderBanks(); renderHome(); toast('Disconnected.');
 }
-function txnDismiss(i){ bankRec().inbox.splice(i,1); save(); renderBanks(); }
+// Remove an inbox row. If it was still pending, remember its fingerprint so the posted version is skipped.
+function txnRemove(i){
+  const b=bankRec(), t=b.inbox[i]; if(!t)return;
+  if(t.pending&&t.acctId)b.done[t.acctId+'|'+(+t.amount).toFixed(2)]=t.posted||Math.floor(Date.now()/1000);
+  b.inbox.splice(i,1);
+}
+function txnDismiss(i){ txnRemove(i); save(); renderBanks(); }
 function txnIncome(i){
   const t=bankRec().inbox[i]; if(!t||t.amount<=0)return;
   const ds=(t.posted?new Date(t.posted*1000):new Date()).toISOString().slice(0,10);
   if(!S.today[ds])S.today[ds]={checks:DAILY_ITEMS.map(()=>false),income:[],note:''};
   S.today[ds].income.push(t.amount);
-  bankRec().inbox.splice(i,1);
+  txnRemove(i);
   save(); renderBanks(); renderToday(); renderMonday(); toast('Income logged.');
 }
 function txnSpend(i){
@@ -1343,7 +1363,7 @@ function txnSpendGo(i){
   if(!S.spend[m])S.spend[m]={};
   if(!S.spend[m][id])S.spend[m][id]=[];
   S.spend[m][id].push(Math.abs(t.amount));
-  bankRec().inbox.splice(i,1);
+  txnRemove(i);
   save(); closeModal(); renderBanks(); renderBudget(); toast('Logged.');
 }
 function txnBill(i){
@@ -1363,7 +1383,7 @@ function txnBillGo(i){
   if(typeof bl.act[k]==='number')bl.act[k]=[bl.act[k]];
   if(!bl.act[k])bl.act[k]=[];
   bl.act[k].push(Math.abs(t.amount));
-  bankRec().inbox.splice(i,1);
+  txnRemove(i);
   save(); closeModal(); renderBanks(); renderBills(); toast('Payment logged.');
 }
 function bankPaste(){
