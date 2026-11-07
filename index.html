@@ -297,12 +297,12 @@ tr:hover td{background:#fcfbf8;}
 
 <div class="tabs">
   <div class="tab active" data-t="home" onclick="showTab('home')">Accounts</div>
+  <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
+  <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
+  <div class="tab" data-t="funds" onclick="showTab('funds')">Buckets</div>
   <div class="tab" data-t="today" onclick="showTab('today')">Today</div>
   <div class="tab" data-t="monday" onclick="showTab('monday')">Money Monday</div>
-  <div class="tab" data-t="funds" onclick="showTab('funds')">Buckets</div>
-  <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
   <div class="tab" data-t="debt" onclick="showTab('debt')">Debt</div>
-  <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
   <div class="tab" data-t="month" onclick="showTab('month')">Month-End</div>
   <div class="tab" data-t="banks" onclick="showTab('banks')">Banks</div>
 </div>
@@ -533,6 +533,7 @@ function defaults(){return {
   bank:{url:'',lastSync:0,accounts:[],inbox:[],seen:{}},
   accounts:[],
   stripe:{key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''},
+  budgetBucket:0,
 };}
 // localStorage is an offline mirror only. Supabase (table fos_state, one
 // jsonb row per user) is the source of truth. Every save() writes the mirror
@@ -747,9 +748,36 @@ function bucketMoveGo(grp,id,dir){
   b.bucket=(+b.bucket||0)+dir*v;
   save(); closeModal(); renderFunds(); renderBills(); toast(b.name+' bucket updated.');
 }
+function budgetBucketCardHTML(){
+  const amt=budgetTotal(), inB=+S.budgetBucket||0, pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
+  const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  return `<div class="fund ${amt>0&&inB>=amt?'full':''}">
+    <div class="name"><span>Spending budget</span></div>
+    <div class="nums"><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt(inB)}</b> of ${fmt0(amt)} <span style="color:var(--amber);font-size:10px">Average</span></div>
+    <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+    <div class="next">Next: <b>${fmt0(amt*12/52)}</b> on ${mon}${inB<amt?' · need '+fmt0(amt-inB)+' this month':' · topped up'}</div>
+    <div class="acts">
+      <button class="small-btn green" onclick="budgetBucketMove(1)">Add</button>
+      <button class="small-btn" onclick="budgetBucketMove(-1)">Take</button>
+      <button class="small-btn" style="margin-left:auto" onclick="showTab('budget')">Budget</button>
+    </div>
+  </div>`;
+}
+function budgetBucketMove(dir){
+  openModal(`<h3>${dir>0?'Add to':'Take from'} spending bucket</h3>
+    <div class="field"><label>Amount</label><input type="number" id="m-amt" step="0.01"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="budgetBucketMoveGo(${dir})">${dir>0?'Add':'Take'}</button></div>`);
+  setTimeout(()=>$('m-amt').focus(),50);
+}
+function budgetBucketMoveGo(dir){
+  const v=parseFloat($('m-amt').value); if(isNaN(v)||v<=0)return;
+  S.budgetBucket=(+S.budgetBucket||0)+dir*v;
+  save(); closeModal(); renderBills(); toast('Spending bucket updated.');
+}
 function renderFunds(){
   const cards=EXP_GROUPS.flatMap(([grp])=>(S.bills[grp]||[]).map(b=>bucketCardHTML(grp,b)));
-  $('bucket-grid').innerHTML=cards.join('')||'<div class="empty">No expenses yet. Add them on the Expenses tab.</div>';
+  cards.push(budgetBucketCardHTML());
+  $('bucket-grid').innerHTML=cards.join('');
   $('fund-grid').innerHTML=S.funds.map(f=>{
     const pct=f.tgt>0?Math.min(100,f.cur/f.tgt*100):0;
     const full=f.tgt>0&&f.cur>=f.tgt;
@@ -872,15 +900,28 @@ function expRowHTML(grp,b){
     <div class="st"><span class="tag st-${ms[0]}">${ms[0]==='paid'?'Paid':ms[0]==='late'?'Late':'Due'}</span></div>
   </div>`;
 }
+// The monthly spending budget (Budget tab) counts as one Home expense so the monthly
+// total is the whole picture. Its bucket is S.budgetBucket.
+const budgetTotal=()=>(S.budget||[]).reduce((s,c)=>s+(+c.tgt||0),0);
+function budgetRowHTML(){
+  const amt=budgetTotal(), inB=+S.budgetBucket||0, pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
+  return `<div class="exp" onclick="showTab('budget')">
+    <div class="l"><div class="nm">Spending budget</div><div class="sub">Monthly · ${(S.budget||[]).length} categories on the Budget tab · <span style="color:var(--amber)">Average</span></div></div>
+    <div class="m"><div class="pair"><span class="in ${inB<0?'neg':''}">${fmt0(inB)}</span> <span style="color:#bbb">/</span> <span class="of">${fmt0(amt)}</span></div><div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div></div>
+    <div class="st"><span class="tag st-due">Budget</span></div>
+  </div>`;
+}
 function renderBills(){
   let html='', tiles='', allIn=0, allAmt=0;
   EXP_GROUPS.forEach(([grp,title])=>{
     const list=S.bills[grp]||[];
-    const amt=list.reduce((s,b)=>s+billPlan(b).amt,0), inB=list.reduce((s,b)=>s+Math.max(0,+b.bucket||0),0);
+    let amt=list.reduce((s,b)=>s+billPlan(b).amt,0), inB=list.reduce((s,b)=>s+Math.max(0,+b.bucket||0),0);
+    let rows=list.map(b=>expRowHTML(grp,b)).join('');
+    if(grp==='home'){ amt+=budgetTotal(); inB+=Math.max(0,+S.budgetBucket||0); rows+=budgetRowHTML(); }
     allAmt+=amt; allIn+=inB;
     tiles+=`<div class="tile"><div class="lbl">${title}</div><div class="big">${fmt0(amt)}</div><div class="in">${fmt0(inB)} of ${fmt0(amt)}</div></div>`;
     html+=`<div class="card"><div class="card-h"><span>${title} · ${fmt0(amt)} / month</span><span class="grp-tot" style="color:var(--money)">${fmt0(inB)} of ${fmt0(amt)}</span></div>
-      <div class="card-b" style="padding:0 12px">${list.map(b=>expRowHTML(grp,b)).join('')||'<div class="empty">Nothing here yet.</div>'}</div></div>`;
+      <div class="card-b" style="padding:0 12px">${rows||'<div class="empty">Nothing here yet.</div>'}</div></div>`;
   });
   $('exp-tiles').innerHTML=tiles+`<div class="tile"><div class="lbl">Monthly total</div><div class="big">${fmt0(allAmt)}</div><div class="in">${fmt0(allIn)} of ${fmt0(allAmt)}</div></div>`;
   $('exp-groups').innerHTML=html;
