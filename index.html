@@ -19,7 +19,31 @@
   --paper:#fafaf8; --panel:#ffffff; --ink:#16181a; --muted:#8a8a85;
   --rule:#e3e1dc; --belt:#b8342b; --money:#1f7a4d; --amber:#a86b1f;
   --soft:#f1efe9;
+  --field:#ffffff; --hover:#fcfbf8; --on-ink:#ffffff; --ink2:#555555; --faint:#bbbbbb;
+  --belt-tint:#fdf2f1; --money-tint:#e7f3ec; --amber-tint:#faf3e0; --red-tint:#fdecea;
+  --blue:#1d4f9e; --blue-tint:#e8effa; --purple:#6d28d9; --purple-tint:#f1e8fa;
+  --gold:#b8342b; --gold-tint:#fdf2f1; --box:#16181a;
 }
+/* DARK MODE: warm near-black with gold tones (Race, 2026-11-07). Green = cash, red = debt stay as is.
+   themeInit() sets data-theme on <html> before first paint: saved choice, else the OS preference. */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#141210; --panel:#1c1915; --ink:#ece4d2; --muted:#9a8f7a;
+  --rule:#332d24; --belt:#e0574d; --money:#5bb87f; --amber:#d4a94a;
+  --soft:#262119;
+  --field:#1c1915; --hover:#221e18; --on-ink:#141210; --ink2:#cbbfa6; --faint:#4e4639;
+  --belt-tint:#3a211c; --money-tint:#1d3326; --amber-tint:#3a2e18; --red-tint:#3a211c;
+  --blue:#8fb0e8; --blue-tint:#1f2a3d; --purple:#b391e6; --purple-tint:#2c2140;
+  --gold:#d4a94a; --gold-tint:#2e2612; --box:#2a241b;
+}
+:root[data-theme="dark"] .brand span{color:var(--gold);}
+:root[data-theme="dark"] .card-h{color:var(--gold);}
+:root[data-theme="dark"] .tab.active{color:var(--gold); background:var(--gold-tint);}
+:root[data-theme="dark"] .small-btn.primary,:root[data-theme="dark"] .modal .row .go,:root[data-theme="dark"] .auth-card .go{background:var(--gold); border-color:var(--gold);}
+:root[data-theme="dark"] .seg span.on{background:var(--gold);}
+:root[data-theme="dark"] input:focus,:root[data-theme="dark"] select:focus,:root[data-theme="dark"] textarea:focus{border-color:var(--gold);}
+:root[data-theme="dark"] #toast{border-left-color:var(--gold);}
+:root[data-theme="dark"] header{border-bottom-color:var(--gold);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{
   font-family:'Archivo',-apple-system,'Segoe UI',Arial,sans-serif;
@@ -29,7 +53,7 @@ body{
 button{font-family:inherit;}
 input,select,textarea{
   font-family:inherit; font-size:13px; color:var(--ink);
-  background:#fff; border:1px solid var(--rule); border-radius:4px;
+  background:var(--field); border:1px solid var(--rule); border-radius:4px;
   padding:6px 9px; outline:none;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--ink);}
@@ -66,7 +90,7 @@ header{grid-column:1 / -1;}
   cursor:pointer; white-space:nowrap; margin-bottom:2px;
 }
 .tab:hover{color:var(--ink); background:var(--soft);}
-.tab.active{color:var(--belt); background:#fdf2f1;}
+.tab.active{color:var(--belt); background:var(--belt-tint);}
 .burger{display:none; font-size:20px; line-height:1; padding:2px 8px; background:none; border:1px solid var(--rule); border-radius:4px; color:var(--ink); cursor:pointer;}
 #nav-scrim{display:none; position:fixed; inset:0; background:rgba(20,20,20,.45); z-index:85;}
 @media(max-width:760px){
@@ -87,16 +111,16 @@ header{grid-column:1 / -1;}
 .card{background:var(--panel); border:1px solid var(--rule); border-radius:6px; margin-bottom:12px; overflow:hidden;}
 .card-h{
   padding:7px 12px; border-bottom:1px solid var(--rule); background:var(--soft);
-  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#555;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--ink2);
   display:flex; justify-content:space-between; align-items:center;
 }
 .card-b{padding:10px 12px;}
 .small-btn{
   font-size:10px; font-weight:600; padding:3px 10px; border-radius:4px;
-  border:1px solid var(--rule); background:#fff; color:var(--ink); cursor:pointer;
+  border:1px solid var(--rule); background:var(--field); color:var(--ink); cursor:pointer;
 }
 .small-btn:hover{border-color:var(--ink);}
-.small-btn.primary{background:var(--ink); color:#fff; border-color:var(--ink);}
+.small-btn.primary{background:var(--ink); color:var(--on-ink); border-color:var(--ink);}
 .small-btn.green{background:var(--money); color:#fff; border-color:var(--money);}
 
 /* CHECKLIST */
@@ -113,31 +137,31 @@ header{grid-column:1 / -1;}
 
 /* TABLES */
 table{width:100%; border-collapse:collapse;}
-th{font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:#999; text-align:left; padding:4px 8px; border-bottom:1px solid var(--rule); white-space:nowrap;}
+th{font-size:9px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); text-align:left; padding:4px 8px; border-bottom:1px solid var(--rule); white-space:nowrap;}
 th.r{text-align:right;}
 td{padding:4px 8px; border-bottom:1px solid var(--soft); white-space:nowrap; font-variant-numeric:tabular-nums;}
 td.r{text-align:right;}
 tr:last-child td{border-bottom:none;}
-tr:hover td{background:#fcfbf8;}
+tr:hover td{background:var(--hover);}
 .tag{font-size:9px; font-weight:700; padding:1px 6px; border-radius:3px; text-transform:uppercase; letter-spacing:.5px;}
-.tag.citi{background:#e8effa; color:#1d4f9e;}
-.tag.qs{background:#e7f3ec; color:var(--money);}
-.tag.chk-acct{background:#faf3e0; color:var(--amber);}
-.tag.venmo{background:#f1e8fa; color:#6d28d9;}
+.tag.citi{background:var(--blue-tint); color:var(--blue);}
+.tag.qs{background:var(--money-tint); color:var(--money);}
+.tag.chk-acct{background:var(--amber-tint); color:var(--amber);}
+.tag.venmo{background:var(--purple-tint); color:var(--purple);}
 .t-auto{color:var(--money); font-weight:600; font-size:11px;}
 .t-manual{color:var(--belt); font-weight:600; font-size:11px;}
 .t-pending{color:var(--amber); font-weight:600; font-size:11px;}
 .link-num{cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;}
-.link-num:hover{color:#1d4f9e;}
+.link-num:hover{color:var(--blue);}
 .mcell{width:38px; text-align:right; font-size:10px;}
 .mcell .plus{
-  display:inline-block; width:22px; text-align:center; color:#ccc; border:1px solid var(--soft);
+  display:inline-block; width:22px; text-align:center; color:var(--faint); border:1px solid var(--soft);
   border-radius:3px; cursor:pointer; font-weight:700;
 }
 .mcell .plus:hover{color:var(--ink); border-color:var(--rule);}
 .mcell .amt{color:var(--money); cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;}
-.mult{color:#1d4f9e; font-size:8px; font-weight:700;}
-.del{background:none; border:none; color:#ddd; cursor:pointer; font-size:14px; padding:0 3px;}
+.mult{color:var(--blue); font-size:8px; font-weight:700;}
+.del{background:none; border:none; color:var(--faint); cursor:pointer; font-size:14px; padding:0 3px;}
 .del:hover{color:var(--belt);}
 
 /* FUNDS */
@@ -160,7 +184,7 @@ tr:hover td{background:#fcfbf8;}
 .alloc .what{flex:1;}
 .alloc .what .d{font-size:11px; color:var(--muted);}
 .surplus-box{
-  background:var(--ink); color:#fff; border-radius:6px; padding:12px 14px; margin-top:10px;
+  background:var(--box); color:#fff; border-radius:6px; padding:12px 14px; margin-top:10px;
   display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
 }
 .surplus-box .label{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#aaa;}
@@ -181,20 +205,20 @@ tr:hover td{background:#fcfbf8;}
 /* MODAL */
 .overlay{position:fixed; inset:0; background:rgba(20,20,20,.45); display:none; align-items:center; justify-content:center; z-index:100; padding:16px;}
 .overlay.open{display:flex;}
-.modal{background:#fff; border-radius:8px; padding:16px; width:100%; max-width:340px; box-shadow:0 10px 40px rgba(0,0,0,.2);}
+.modal{background:var(--panel); border-radius:8px; padding:16px; width:100%; max-width:340px; box-shadow:0 10px 40px rgba(0,0,0,.2);}
 .modal h3{font-size:14px; margin-bottom:10px;}
 .modal .field{margin-bottom:9px;}
 .modal label{display:block; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:3px;}
 .modal input,.modal select,.modal textarea{width:100%;}
 .modal .row{display:flex; gap:8px; margin-top:12px;}
-.modal .row button{flex:1; padding:7px; border-radius:5px; font-weight:700; cursor:pointer; border:1px solid var(--rule); background:#fff;}
-.modal .row .go{background:var(--ink); color:#fff; border-color:var(--ink);}
+.modal .row button{flex:1; padding:7px; border-radius:5px; font-weight:700; cursor:pointer; border:1px solid var(--rule); background:var(--field); color:var(--ink);}
+.modal .row .go{background:var(--ink); color:var(--on-ink); border-color:var(--ink);}
 .pay-list{margin-bottom:8px; max-height:140px; overflow-y:auto;}
 .pay-item{display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--soft); font-size:12px;}
-.empty{color:#bbb; font-style:italic; font-size:12px; padding:6px 0;}
+.empty{color:var(--faint); font-style:italic; font-size:12px; padding:6px 0;}
 .note-line{font-size:11px; color:var(--muted); margin-top:6px; line-height:1.5;}
 #toast{
-  position:fixed; bottom:16px; right:16px; background:var(--ink); color:#fff;
+  position:fixed; bottom:16px; right:16px; background:var(--box); color:#fff;
   padding:9px 14px; border-radius:5px; font-size:12px; opacity:0; transition:opacity .25s;
   pointer-events:none; z-index:200; border-left:3px solid var(--money);
 }
@@ -205,11 +229,11 @@ tr:hover td{background:#fcfbf8;}
 .home-q{font-size:15px; font-weight:800; letter-spacing:.3px;}
 .home-sub{font-size:11px; color:var(--muted); margin-top:2px;}
 .seg{display:inline-flex; border:1px solid var(--rule); border-radius:6px; overflow:hidden; font-size:11px;}
-.seg span{padding:5px 9px; cursor:pointer; color:var(--muted); background:#fff;}
-.seg span.on{background:var(--ink); color:#fff;}
+.seg span{padding:5px 9px; cursor:pointer; color:var(--muted); background:var(--field);}
+.seg span.on{background:var(--ink); color:var(--on-ink);}
 .acct{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .acct:last-child{border-bottom:none;}
-.acct:hover{background:#fcfbf8;}
+.acct:hover{background:var(--hover);}
 .acct .nm{font-weight:700;}
 .acct .sub{font-size:11px; color:var(--muted); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
 .acct .bal{margin-left:auto; text-align:right; font-weight:800; font-size:15px; font-variant-numeric:tabular-nums; white-space:nowrap;}
@@ -219,7 +243,7 @@ tr:hover td{background:#fcfbf8;}
 .grp-tot.neg{color:var(--belt);}
 .exp{display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .exp:last-child{border-bottom:none;}
-.exp:hover{background:#fcfbf8;}
+.exp:hover{background:var(--hover);}
 .exp .l{flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; white-space:nowrap; overflow:hidden;}
 .exp .dot{width:7px; height:7px; border-radius:50%; flex:none; align-self:center;}
 .exp .nm{font-weight:700; flex:none;}
@@ -243,12 +267,12 @@ tr:hover td{background:#fcfbf8;}
 .fund .next b{color:var(--ink);}
 .fund.behind{border-color:var(--belt);}
 .fund.behind .name::after{content:'BEHIND'; font-size:8px; color:var(--belt); font-weight:800; letter-spacing:1px;}
-.tag.st-paid{background:#e7f3ec; color:var(--money);}
-.tag.st-due{background:var(--soft); color:#777;}
-.tag.st-late{background:#fdecea; color:var(--belt);}
-.tag.ok{background:#e7f3ec; color:var(--money);}
-.tag.man{background:var(--soft); color:#777;}
-.tag.attn{background:#faf3e0; color:var(--amber);}
+.tag.st-paid{background:var(--money-tint); color:var(--money);}
+.tag.st-due{background:var(--soft); color:var(--muted);}
+.tag.st-late{background:var(--red-tint); color:var(--belt);}
+.tag.ok{background:var(--money-tint); color:var(--money);}
+.tag.man{background:var(--soft); color:var(--muted);}
+.tag.attn{background:var(--amber-tint); color:var(--amber);}
 .attn-box{border-color:var(--amber);}
 .attn-box .card-b{color:var(--amber); font-size:12px;}
 .acct.nest{padding-left:16px; border-left:2px solid var(--soft); margin-left:4px;}
@@ -259,7 +283,7 @@ tr:hover td{background:#fcfbf8;}
 .inc .cell{flex:1; min-width:120px;}
 .inc .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
 .inc .amt{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money);}
-.inc .amt.zero{color:#bbb;}
+.inc .amt.zero{color:var(--faint);}
 .inc .when{font-size:11px; color:var(--muted);}
 
 /* AUTH GATE */
@@ -270,7 +294,7 @@ tr:hover td{background:#fcfbf8;}
 .auth-card .field{margin-bottom:10px;}
 .auth-card label{display:block; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:3px;}
 .auth-card input{width:100%;}
-.auth-card .go{width:100%; padding:8px; border-radius:5px; font-weight:700; cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:#fff; margin-top:4px;}
+.auth-card .go{width:100%; padding:8px; border-radius:5px; font-weight:700; cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:var(--on-ink); margin-top:4px;}
 .auth-card .go:disabled{opacity:.6;}
 #auth-err{color:var(--belt); font-size:11px; margin-top:8px; min-height:14px;}
 #sync-dot{font-size:10px; font-weight:600; align-self:center;}
@@ -307,6 +331,7 @@ tr:hover td{background:#fcfbf8;}
   </div>
   <div class="tools">
     <span id="sync-dot"></span>
+    <button class="tool-btn" id="theme-btn" onclick="themeToggle()">Dark</button>
     <button class="tool-btn" onclick="exportData()">Export</button>
     <button class="tool-btn" onclick="openImport()">Import</button>
     <button class="tool-btn" onclick="signOut()">Sign out</button>
@@ -490,6 +515,26 @@ tr:hover td{background:#fcfbf8;}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 'use strict';
+
+// ── THEME (light / dark, gold tones) ───────────────────────────────
+// Per-device choice in localStorage (not part of S); falls back to the OS preference.
+function themeApply(t){
+  document.documentElement.dataset.theme=t;
+  const m=document.querySelector('meta[name="theme-color"]'); if(m)m.content=t==='dark'?'#141210':'#16181a';
+  const b=document.getElementById('theme-btn'); if(b)b.textContent=t==='dark'?'Light':'Dark';
+}
+function themeInit(){
+  let t='';
+  try{t=localStorage.getItem('bares_theme')||'';}catch(e){}
+  if(t!=='dark'&&t!=='light')t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  themeApply(t);
+}
+function themeToggle(){
+  const t=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  try{localStorage.setItem('bares_theme',t);}catch(e){}
+  themeApply(t);
+}
+themeInit();
 
 // ── SUPABASE (cloud persistence — BaresTKD shared project) ─────────
 const SUPABASE_URL='https://akdncbzxiwvihfcyijvm.supabase.co';
@@ -935,7 +980,7 @@ function expRowHTML(grp,b){
   const pct=p.amt>0?Math.max(0,Math.min(100,p.bucket/p.amt*100)):0;
   const pair=p.kind==='asneeded'
     ?`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="font-size:10px;color:${k[1]}">as needed</span>`
-    :`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="color:#bbb">/</span> <span class="of">${fmt0(p.amt)}</span>`;
+    :`<span class="in ${p.bucket<0?'neg':''}">${fmt0(p.bucket)}</span> <span style="color:var(--faint)">/</span> <span class="of">${fmt0(p.amt)}</span>`;
   // One line per expense: type dot, name, then the small details inline (due day, paid from, and
   // Pending only when the payment method still needs switching). No paid/due/late chip.
   const sub=[b.due?esc(b.due):'',payAcctLabel(b),b.pay==='pending'?'<span class="t-pending">Pending</span>':''].filter(Boolean).join(' · ');
@@ -951,7 +996,7 @@ function budgetRowHTML(){
   const amt=budgetTotal(), inB=+S.budgetBucket||0, pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
   return `<div class="exp" onclick="showTab('budget')" title="Average">
     <div class="l"><span class="dot" style="background:var(--amber)"></span><span class="nm">Spending budget</span><span class="sub">${(S.budget||[]).length} categories on the Budget tab</span></div>
-    <div class="m"><div class="pair"><span class="in ${inB<0?'neg':''}">${fmt0(inB)}</span> <span style="color:#bbb">/</span> <span class="of">${fmt0(amt)}</span></div><div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div></div>
+    <div class="m"><div class="pair"><span class="in ${inB<0?'neg':''}">${fmt0(inB)}</span> <span style="color:var(--faint)">/</span> <span class="of">${fmt0(amt)}</span></div><div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div></div>
     <div class="st"><span class="tag st-due">Budget</span></div>
   </div>`;
 }
@@ -1052,7 +1097,7 @@ function delBill(grp,id){
 function delBillGo(grp,id){ S.bills[grp]=S.bills[grp].filter(b=>b.id!==id); save(); closeModal(); renderBills(); }
 
 // ── DEBT ───────────────────────────────────────────────────────────
-const ST_LABEL={bills:['Bill card — paid weekly','#1d4f9e'],payoff:['Payoff target','var(--belt)'],close:['Payoff → CLOSE (fee card)','var(--belt)'],park:['Parked + frozen','var(--money)']};
+const ST_LABEL={bills:['Bill card — paid weekly','var(--blue)'],payoff:['Payoff target','var(--belt)'],close:['Payoff → CLOSE (fee card)','var(--belt)'],park:['Parked + frozen','var(--money)']};
 function renderDebt(){
   const sorted=[...S.debts].sort((a,b)=>b.apr-a.apr);
   const tgt=avalancheTarget();
@@ -1062,7 +1107,7 @@ function renderDebt(){
     const isT=tgt&&tgt.id===d.id;
     const st=ST_LABEL[d.st]||['',''];
     const sub=[`<span>${d.apr}% APR</span>`,st[0]?`<span style="color:${st[1]}">${st[0]}</span>`:'',d.min>0?`<span>min ${fmt0(d.min)}</span>`:'',d.due?`<span>due ${esc(d.due)}</span>`:''].filter(Boolean).join('');
-    return `<div class="acct" onclick="balModal(${d.id})" style="${isT?'background:#fdf2f1;margin:0 -12px;padding-left:12px;padding-right:12px;':''}">
+    return `<div class="acct" onclick="balModal(${d.id})" style="${isT?'background:var(--belt-tint);margin:0 -12px;padding-left:12px;padding-right:12px;':''}">
       <div><div class="nm">${esc(d.name)}${isT?' <span class="tag" style="background:var(--belt);color:#fff">TARGET</span>':''}${d.bal===0?' <span class="tag qs">$0</span>':''}</div>
         <div class="sub">${sub}</div></div>
       <div class="bal ${d.bal>0?'neg':''}">${fmt(d.bal)}${int>0?'<span class="asof">'+fmt(int)+'/mo interest</span>':''}</div>
