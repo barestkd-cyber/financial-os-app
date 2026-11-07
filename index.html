@@ -632,6 +632,20 @@ function navToggle(open){
   const o=typeof open==='boolean'?open:!$('nav').classList.contains('open');
   $('nav').classList.toggle('open',o); $('nav-scrim').classList.toggle('open',o);
 }
+// Phone: swipe right anywhere to pull the drawer out, swipe left to put it away (Race, 2026-11-07).
+// Only a clearly horizontal swipe counts, so vertical scrolling and table scrolling are untouched.
+let swipeX=null, swipeY=null;
+document.addEventListener('touchstart',e=>{
+  const t=e.touches[0]; swipeX=t.clientX; swipeY=t.clientY;
+  if(e.target.closest('table,input,textarea,select,.modal'))swipeX=null;
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(swipeX===null||window.innerWidth>760)return;
+  const t=e.changedTouches[0], dx=t.clientX-swipeX, dy=t.clientY-swipeY; swipeX=null;
+  if(Math.abs(dx)<60||Math.abs(dy)>Math.abs(dx)/2)return;
+  if(dx>0&&!$('nav').classList.contains('open'))navToggle(true);
+  else if(dx<0&&$('nav').classList.contains('open'))navToggle(false);
+},{passive:true});
 function showTab(t){
   navToggle(false);
   document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.t===t));
