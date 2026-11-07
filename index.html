@@ -1192,9 +1192,8 @@ function acctStatus(a){
 }
 function acctRowHTML(a,i,extra){
   const st=acctStatus(a), bal=+a.balance||0, debt=isDebtType(a.type);
-  // SimpleFIN's available-balance for cards is available credit, sign varies by bank and
-  // some banks send 0 when they don't report it, so only a non-zero value is shown.
-  const avail=a.type==='credit'&&a.source==='synced'&&Math.abs(+a.avail||0)>0?fmt0(Math.abs(+a.avail))+' available':'';
+  // SimpleFIN's available-balance for cards is available credit; sign varies by bank.
+  const avail=a.type==='credit'&&a.source==='synced'&&a.avail!==undefined&&a.avail!==null&&!isNaN(+a.avail)?fmt0(Math.abs(+a.avail))+' available':'';
   const sub2=[debt&&bal<0?'owed':'',avail,a.asOf?'as of '+new Date(a.asOf*1000).toLocaleDateString():''].filter(Boolean).join(' · ');
   const x=extra||{};
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
