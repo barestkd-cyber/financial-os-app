@@ -455,6 +455,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 let sbUser=null;        // Supabase auth user, set after sign-in
 let cloudReady=false;   // true once the fos_state row was fetched or confirmed absent
 let fromDefaults=false; // S was seeded from defaults() because neither cloud nor mirror had data
+let cloudSeen='';       // updated_at of the cloud row this device last loaded or wrote (multi-device guard)
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -540,11 +541,35 @@ async function cloudSave(){
       }
       cloudReady=true;
     }
-    const {error}=await sb.from('fos_state').upsert({user_id:sbUser.id,data:S,updated_at:new Date().toISOString()});
+    // Multi-device guard: if another device wrote since this one loaded, carry its
+    // credentials and fresher sync results into this save instead of erasing them.
+    const {data:cur}=await sb.from('fos_state').select('data,updated_at').eq('user_id',sbUser.id).maybeSingle();
+    if(cur&&cur.updated_at&&cur.updated_at!==cloudSeen&&cur.data)mergeRemote(cur.data);
+    const stamp=new Date().toISOString();
+    const {error}=await sb.from('fos_state').upsert({user_id:sbUser.id,data:S,updated_at:stamp});
     if(error)throw error;
+    cloudSeen=stamp; writeMirror();
     syncDot(true);
   }catch(e){ syncDot(false); }
 }
+function mergeRemote(r){
+  const lb=bankRec(), ls=stripeRec();
+  if(r.bank&&r.bank.url&&!lb.url)lb.url=r.bank.url;
+  if(r.stripe&&r.stripe.key){
+    if(!ls.key||(r.stripe.lastSync||0)>(ls.lastSync||0))S.stripe=Object.assign({},r.stripe,{key:ls.key||r.stripe.key});
+  }
+}
+// A device that comes back to the foreground reloads the cloud row if another
+// device saved meanwhile (and nothing is waiting to be saved here).
+async function refreshIfStale(){
+  if(!sbUser||!S||_saveT||document.visibilityState!=='visible')return;
+  try{
+    const {data}=await sb.from('fos_state').select('data,updated_at').eq('user_id',sbUser.id).maybeSingle();
+    if(data&&data.updated_at&&data.updated_at!==cloudSeen&&data.data){ S=data.data; cloudSeen=data.updated_at; writeMirror(); renderAll(); }
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',refreshIfStale);
+window.addEventListener('focus',refreshIfStale);
 function syncDot(ok){
   const el=$('sync-dot'); if(!el)return;
   el.textContent=ok?'Synced':'Offline';
@@ -1464,13 +1489,13 @@ async function enterApp(user){
 async function loadState(){
   let row=null, fetched=false;
   try{
-    const {data,error}=await sb.from('fos_state').select('data').eq('user_id',sbUser.id).maybeSingle();
+    const {data,error}=await sb.from('fos_state').select('data,updated_at').eq('user_id',sbUser.id).maybeSingle();
     if(error)throw error;
     fetched=true; row=data;
   }catch(e){}
   cloudReady=fetched;
   if(fetched&&row&&row.data){
-    S=row.data; writeMirror(); syncDot(true); return;
+    S=row.data; cloudSeen=row.updated_at||''; writeMirror(); syncDot(true); return;
   }
   const local=readMirror();
   if(local){
