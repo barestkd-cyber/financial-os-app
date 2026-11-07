@@ -1187,7 +1187,7 @@ function savePL(){
 function bankRec(){
   if(!S.bank)S.bank={url:'',lastSync:0,accounts:[],inbox:[],seen:{}};
   if(!S.bank.seen)S.bank.seen={};
-  if(!S.bank.done)S.bank.done={};
+  if(!Array.isArray(S.bank.done))S.bank.done=[]; // fingerprints of logged/dismissed pending rows
   if(!S.bank.inbox)S.bank.inbox=[];
   if(!S.bank.accounts)S.bank.accounts=[];
   return S.bank;
@@ -1233,27 +1233,27 @@ async function bankSync(manual){
     reg.forEach(r=>{ if(r.source==='synced'&&!incoming.has(r.sfId))r.stale=true; });
     b.lastErrors=(data.errors||[]).map(x=>String(x).slice(0,160)).slice(0,5);
     let added=0;
-    // A pending transaction usually comes back with a different id once it posts. When a posted one
-    // arrives, it replaces the matching pending inbox entry (same account, same amount, within a week),
-    // or is skipped if that pending entry was already logged or dismissed (b.done fingerprints).
-    const twin=(acctId,amt,posted)=>b.inbox.findIndex(x=>x.pending&&x.acctId===acctId&&Math.abs(x.amount-amt)<0.005&&Math.abs((x.posted||0)-(posted||0))<=7*86400);
+    // Pending rows are a live snapshot: wiped every sync and re-added from the feed, never recorded in
+    // `seen` (a bank may keep the same id when it posts, and that posted row must still come through).
+    // Posted rows are append-only, deduped by id. A posted row is skipped when it matches a fingerprint
+    // in b.done (a pending row that was already logged or dismissed: same account, same amount, within
+    // 5 days), one fingerprint per row, so two identical swipes in a day each need their own.
+    b.inbox=b.inbox.filter(t=>!t.pending);
+    const fpIdx=(acctId,amt,posted)=>b.done.findIndex(f=>f.acctId===acctId&&Math.abs(f.amount-amt)<0.005&&Math.abs((f.posted||0)-(posted||0))<=5*86400);
     (data.accounts||[]).forEach(a=>(a.transactions||[]).forEach(t=>{
+      const row={acct:a.name,acctId:a.id,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending};
+      if(row.pending){ b.inbox.push(row); return; }
       const key=a.id+'|'+t.id;
       if(b.seen[key])return;
       b.seen[key]=t.posted||now;
-      const row={acct:a.name,acctId:a.id,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending};
-      if(!row.pending){
-        const fp=a.id+'|'+row.amount.toFixed(2);
-        if(b.done[fp]&&Math.abs(b.done[fp]-(row.posted||now))<=7*86400){ delete b.done[fp]; return; }
-        const j=twin(a.id,row.amount,row.posted);
-        if(j>=0){ b.inbox[j]=row; return; }
-      }
+      const j=fpIdx(a.id,row.amount,row.posted);
+      if(j>=0){ b.done.splice(j,1); return; }
       b.inbox.push(row);
       added++;
     }));
     const cutoff=now-180*86400;
     for(const k of Object.keys(b.seen)){ if(b.seen[k]<cutoff)delete b.seen[k]; }
-    for(const k of Object.keys(b.done)){ if(b.done[k]<now-30*86400)delete b.done[k]; }
+    b.done=b.done.filter(f=>(f.posted||0)>=now-30*86400);
     b.inbox.sort((x,y)=>(y.posted||0)-(x.posted||0));
     if(b.inbox.length>300)b.inbox.length=300;
     b.lastSync=Date.now();
@@ -1334,10 +1334,11 @@ function bankDisconnectGo(){
   acctRec().forEach(a=>{ if(a.source==='synced')a.stale=true; }); // keep the accounts; they re-match by id on reconnect
   save(); closeModal(); renderBanks(); renderHome(); toast('Disconnected.');
 }
-// Remove an inbox row. If it was still pending, remember its fingerprint so the posted version is skipped.
+// Remove an inbox row. If it was still pending, keep a fingerprint so the posted version is skipped
+// (the log already carries the payment; the posted row would be a double).
 function txnRemove(i){
   const b=bankRec(), t=b.inbox[i]; if(!t)return;
-  if(t.pending&&t.acctId)b.done[t.acctId+'|'+(+t.amount).toFixed(2)]=t.posted||Math.floor(Date.now()/1000);
+  if(t.pending&&t.acctId)b.done.push({acctId:t.acctId,amount:+t.amount,posted:t.posted||Math.floor(Date.now()/1000)});
   b.inbox.splice(i,1);
 }
 function txnDismiss(i){ txnRemove(i); save(); renderBanks(); }
