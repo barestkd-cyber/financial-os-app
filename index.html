@@ -201,6 +201,9 @@ tr:hover td{background:#fcfbf8;}
 .acct .bal .asof{display:block; font-size:9px; font-weight:500; color:var(--muted);}
 .grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:12px; color:var(--ink);}
 .grp-tot.neg{color:var(--belt);}
+.tag.st-paid{background:#e7f3ec; color:var(--money);}
+.tag.st-due{background:var(--soft); color:#777;}
+.tag.st-late{background:#fdecea; color:var(--belt);}
 .tag.ok{background:#e7f3ec; color:var(--money);}
 .tag.man{background:var(--soft); color:#777;}
 .tag.attn{background:#faf3e0; color:var(--amber);}
@@ -273,7 +276,7 @@ tr:hover td{background:#fcfbf8;}
   <div class="tab" data-t="today" onclick="showTab('today')">Today</div>
   <div class="tab" data-t="monday" onclick="showTab('monday')">Money Monday</div>
   <div class="tab" data-t="funds" onclick="showTab('funds')">Funds</div>
-  <div class="tab" data-t="bills" onclick="showTab('bills')">Bills</div>
+  <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
   <div class="tab" data-t="debt" onclick="showTab('debt')">Debt</div>
   <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
   <div class="tab" data-t="month" onclick="showTab('month')">Month-End</div>
@@ -352,23 +355,12 @@ tr:hover td{background:#fcfbf8;}
 
 <!-- BILLS -->
 <div class="page" id="p-bills"><div class="wrap">
-  <div class="card">
-    <div class="card-h">School <button class="small-btn" onclick="addBill('school')">+ Add</button></div>
-    <div style="overflow-x:auto;"><table>
-      <thead><tr><th>Bill</th><th>Due</th><th class="r">Cost/mo</th><th>Acct</th><th>Pay</th>
-      <th class="r">J</th><th class="r">F</th><th class="r">M</th><th class="r">A</th><th class="r">M</th><th class="r">J</th><th class="r">J</th><th class="r">A</th><th class="r">S</th><th class="r">O</th><th class="r">N</th><th class="r">D</th><th></th></tr></thead>
-      <tbody id="bills-school"></tbody>
-    </table></div>
+  <div class="home-top">
+    <div><div class="home-q">What does it cost to run everything?</div><div class="home-sub" id="exp-sub"></div></div>
+    <div style="display:flex; gap:6px;"><button class="small-btn primary" onclick="addBill()">+ Add expense</button></div>
   </div>
-  <div class="card">
-    <div class="card-h">Home <button class="small-btn" onclick="addBill('home')">+ Add</button></div>
-    <div style="overflow-x:auto;"><table>
-      <thead><tr><th>Bill</th><th>Due</th><th class="r">Cost/mo</th><th>Acct</th><th>Pay</th>
-      <th class="r">J</th><th class="r">F</th><th class="r">M</th><th class="r">A</th><th class="r">M</th><th class="r">J</th><th class="r">J</th><th class="r">A</th><th class="r">S</th><th class="r">O</th><th class="r">N</th><th class="r">D</th><th></th></tr></thead>
-      <tbody id="bills-home"></tbody>
-    </table></div>
-  </div>
-  <div class="note-line">Green amount = fixed (same every month). Blue = varies, showing YTD average. Click a month cell to log what actually got paid — multiple payments per month supported.</div>
+  <div id="exp-groups"></div>
+  <div class="note-line">Budget = the highest of the last 3 actual payments (your estimate until there are 3). Tap an expense to edit it or log a payment. Released = budget minus what actually got paid this month; that goes to the payoff target.</div>
 </div></div>
 
 <!-- DEBT -->
@@ -739,82 +731,142 @@ function delFundGo(id){S.funds=S.funds.filter(f=>f.id!==id); save(); closeModal(
 // ── BILLS ──────────────────────────────────────────────────────────
 const ACCT_TAG={citi:['citi','Citi'],qs:['qs','QS'],chk:['chk-acct','Checking'],venmo:['venmo','Venmo']};
 function mTotal(act,m){const v=act[m]; if(!v)return 0; return Array.isArray(v)?v.reduce((a,b)=>a+b,0):+v;}
-function billAvg(b){
-  const vals=Object.keys(b.act||{}).map(k=>mTotal(b.act,k)).filter(v=>v>0);
-  if(!vals.length)return null;
-  return {avg:vals.reduce((a,c)=>a+c,0)/vals.length, fixed:vals.length>1&&vals.every(v=>Math.abs(v-vals[0])<0.02)};
+// Expenses page (replaced the month-grid Bills tab, Nov 2026). Same data:
+// S.bills.school[] (Taekwondo) and S.bills.home[], each {id,name,due,cost,hi,acct,pay,act,payAcct}.
+// act = payment history: 'YYYY-MM' keys (new) or a bare month number (legacy = this year),
+// each an array of payments. Budget = highest of the last 3 months with payments; until
+// there are 3, the hand-entered estimate (hi, else cost) or any higher actual.
+const EXP_GROUPS=[['school','Taekwondo'],['home','Home']];
+const ymOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const ymNow=()=>ymOf(new Date());
+function keyYm(k){ return /^\d{4}-\d{2}$/.test(k)?k:new Date().getFullYear()+'-'+String(+k).padStart(2,'0'); }
+function actKey(b,ym){
+  if(!b.act)b.act={};
+  if(b.act[ym])return ym;
+  const legacy=String(+ym.slice(5));
+  if(ym.slice(0,4)===String(new Date().getFullYear())&&b.act[legacy])return legacy;
+  return ym;
+}
+function billActuals(b){
+  return Object.keys(b.act||{}).map(k=>({key:k,ym:keyYm(k),total:mTotal(b.act,k)})).filter(x=>x.total>0).sort((a,c)=>a.ym<c.ym?-1:1);
+}
+function billStats(b){
+  const acts=billActuals(b), last=acts.slice(-3), est=Math.max(+b.hi||0,+b.cost||0);
+  const avg=last.length?last.reduce((s,x)=>s+x.total,0)/last.length:0;
+  const budget=last.length>=3?Math.max(...last.map(x=>x.total)):Math.max(est,...last.map(x=>x.total));
+  return {acts,last,avg,budget,est,fromActuals:last.length>=3};
+}
+function dueDay(b){ const m=String(b.due||'').match(/\d{1,2}/); return m?+m[0]:0; }
+function billMonthState(b){
+  const paid=mTotal(b.act||{},actKey(b,ymNow()));
+  if(paid>0)return ['paid','Paid '+fmt0(paid),paid];
+  const d=dueDay(b);
+  if(d&&new Date().getDate()>d)return ['late','Late, due '+esc(b.due),0];
+  return ['due',b.due?'Due '+esc(b.due):'Due',0];
+}
+function payAcctLabel(b){
+  if(b.payAcct){ const a=acctRec().find(x=>x.id===b.payAcct); if(a)return esc(acctLabel(a)); }
+  const t=ACCT_TAG[b.acct]; return t?t[1]:esc(b.acct||'');
 }
 function renderBills(){
-  ['school','home'].forEach(grp=>{
-    const tb=$('bills-'+grp);
-    tb.innerHTML=S.bills[grp].map(b=>{
-      const a=billAvg(b);
-      let cost;
-      if(a){cost=`<span style="color:${a.fixed?'var(--money)':'#1d4f9e'};font-weight:700">${fmt(a.avg)}</span>`;}
-      else if(b.hi>0){cost=`<span style="color:var(--amber)">${fmt0(b.cost)}–${fmt0(b.hi)}</span>`;}
-      else{cost=`<span style="color:var(--muted)">${fmt(b.cost)}</span>`;}
-      const tag=ACCT_TAG[b.acct]||['chk-acct',b.acct];
+  let html='', grand=0, paidTot=0, released=0;
+  EXP_GROUPS.forEach(([grp,title])=>{
+    const list=S.bills[grp]||[];
+    const sub=list.reduce((s,b)=>s+billStats(b).budget,0); grand+=sub;
+    const rows=list.map(b=>{
+      const st=billStats(b), ms=billMonthState(b);
+      if(ms[2]>0){ paidTot+=ms[2]; released+=Math.max(0,st.budget-ms[2]); }
       const payCls=b.pay==='auto'?'t-auto':b.pay==='manual'?'t-manual':'t-pending';
-      const payLbl=b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending';
-      const cells=MONTHS.map((m,i)=>{
-        const mo=i+1, tot=mTotal(b.act||{},mo);
-        const arr=b.act&&b.act[mo], n=Array.isArray(arr)?arr.length:(arr?1:0);
-        if(tot>0)return `<td class="mcell"><span class="amt" onclick="payModal('${grp}',${b.id},${mo})">${fmt0(tot)}</span>${n>1?'<span class="mult">×'+n+'</span>':''}</td>`;
-        return `<td class="mcell"><span class="plus" onclick="payModal('${grp}',${b.id},${mo})">+</span></td>`;
-      }).join('');
-      return `<tr><td>${b.name}</td><td style="color:var(--muted)">${b.due}</td><td class="r">${cost}</td>
-        <td><span class="tag ${tag[0]}">${tag[1]}</span></td><td><span class="${payCls}">${payLbl}</span></td>
-        ${cells}<td><button class="del" onclick="delBill('${grp}',${b.id})">×</button></td></tr>`;
-    }).join('')||'<tr><td colspan="18" class="empty">No bills.</td></tr>';
+      const last3=st.last.map(x=>fmt0(x.total)).join(' · ')||'<span style="color:#bbb">none yet</span>';
+      return `<tr onclick="billOpen('${grp}',${b.id})" style="cursor:pointer">
+        <td><b>${esc(b.name)}</b><div style="font-size:10px;color:var(--muted)">${payAcctLabel(b)} · <span class="${payCls}">${b.pay==='auto'?'Auto':b.pay==='manual'?'Manual':'Pending'}</span></div></td>
+        <td style="color:var(--muted)">${esc(b.due||'')}</td>
+        <td class="r"><b>${fmt0(st.budget)}</b>${st.fromActuals?'':'<div style="font-size:9px;color:var(--amber)">estimate</div>'}</td>
+        <td class="r" style="color:var(--muted)">${st.avg?fmt0(st.avg):''}</td>
+        <td class="r" style="font-size:11px;color:var(--muted)">${last3}</td>
+        <td><span class="tag st-${ms[0]}">${ms[1]}</span></td></tr>`;
+    }).join('')||'<tr><td colspan="6" class="empty">Nothing here yet.</td></tr>';
+    html+=`<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot">${fmt0(sub)}/mo</span></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Expense</th><th>Due</th><th class="r">Budget</th><th class="r">Avg</th><th class="r">Last 3</th><th>This month</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   });
+  html+=`<div class="card"><div class="card-b"><div class="inc">
+    <div class="cell"><div class="lbl">Fund per month</div><div class="amt" style="color:var(--ink)">${fmt0(grand)}</div></div>
+    <div class="cell"><div class="lbl">Paid this month</div><div class="amt ${paidTot?'':'zero'}">${fmt0(paidTot)}</div></div>
+    <div class="cell"><div class="lbl">Released</div><div class="amt ${released?'':'zero'}">${fmt0(released)}</div><div class="when">budget minus actual, to the payoff target</div></div>
+  </div></div></div>`;
+  $('exp-groups').innerHTML=html;
+  const n=EXP_GROUPS.reduce((s,[g])=>s+(S.bills[g]||[]).length,0);
+  $('exp-sub').textContent=n+' expense'+(n===1?'':'s')+' · '+MNAMES[new Date().getMonth()]+' '+new Date().getFullYear();
 }
-let _pg,_pid,_pm;
-function payModal(grp,id,mo){
-  _pg=grp;_pid=id;_pm=mo;
-  const b=S.bills[grp].find(x=>x.id===id);
-  if(!b.act)b.act={};
-  if(typeof b.act[mo]==='number')b.act[mo]=[b.act[mo]];
-  const list=(b.act[mo]||[]).map((v,i)=>`<div class="pay-item"><span>${fmt(v)}</span><button class="del" onclick="payDel(${i})">×</button></div>`).join('');
-  const tot=mTotal(b.act,mo);
-  openModal(`<h3>${b.name} — ${MNAMES[mo-1]}</h3>
-    <div class="pay-list">${list||'<div class="empty">No payments yet.</div>'}</div>
-    ${tot>0?'<div style="font-weight:700;color:var(--money);margin-bottom:8px">Total: '+fmt(tot)+'</div>':''}
-    <div class="field"><label>Add a payment</label><input type="number" id="m-pay" step="0.01" onkeydown="if(event.key==='Enter')payAdd()"></div>
-    <div class="row"><button onclick="closeModal()">Done</button><button class="go" onclick="payAdd()">Add</button></div>`);
-  setTimeout(()=>$('m-pay').focus(),50);
-}
-function payAdd(){
-  const v=parseFloat($('m-pay').value); if(isNaN(v)||v<=0)return;
-  const b=S.bills[_pg].find(x=>x.id===_pid);
-  if(!b.act[_pm])b.act[_pm]=[];
-  b.act[_pm].push(v); save(); renderBills(); payModal(_pg,_pid,_pm);
-}
-function payDel(i){
-  const b=S.bills[_pg].find(x=>x.id===_pid);
-  b.act[_pm].splice(i,1);
-  if(!b.act[_pm].length)delete b.act[_pm];
-  save(); renderBills(); payModal(_pg,_pid,_pm);
-}
-function addBill(grp){
-  openModal(`<h3>Add bill — ${grp}</h3>
-    <div class="field"><label>Name</label><input id="m-name"></div>
-    <div class="field"><label>Due</label><input id="m-due" placeholder="e.g. 15th"></div>
-    <div class="field"><label>Cost (or range low)</label><input type="number" id="m-cost" step="0.01"></div>
-    <div class="field"><label>Range high (blank if fixed)</label><input type="number" id="m-hi" step="0.01"></div>
-    <div class="field"><label>Account</label><select id="m-acct">
-      <option value="citi">Citi</option><option value="qs">Quicksilver</option>
-      <option value="chk">Checking</option><option value="venmo">Venmo</option></select></div>
+function billFieldsHTML(b){
+  const accts=acctRec().filter(a=>!a.hidden&&a.type!=='loan'); // cash accounts and cards can pay an expense
+  const grpOpts=EXP_GROUPS.map(([g,t])=>`<option value="${g}" ${b.grp===g?'selected':''}>${t}</option>`).join('');
+  const acctOpts='<option value="">Not set</option>'+accts.map(a=>`<option value="${esc(a.id)}" ${a.id===b.payAcct?'selected':''}>${esc(acctLabel(a))}</option>`).join('');
+  return `<div class="field"><label>Name</label><input id="m-name" value="${esc(b.name||'')}"></div>
+    <div class="field"><label>Group</label><select id="m-grp">${grpOpts}</select></div>
+    <div class="field"><label>Due (e.g. 15th, Biweekly)</label><input id="m-due" value="${esc(b.due||'')}"></div>
+    <div class="field"><label>Paid from</label><select id="m-payacct">${acctOpts}</select></div>
     <div class="field"><label>Payment</label><select id="m-pay-t">
-      <option value="auto">Autopay</option><option value="manual">Manual</option><option value="pending">Pending switch</option></select></div>
-    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="addBillGo('${grp}')">Add</button></div>`);
+      <option value="auto" ${b.pay==='auto'?'selected':''}>Autopay</option><option value="manual" ${b.pay==='manual'?'selected':''}>Manual</option><option value="pending" ${b.pay==='pending'?'selected':''}>Pending switch</option></select></div>
+    <div class="field"><label>Estimate (used until 3 real payments)</label><div style="display:flex;gap:6px"><input type="number" id="m-cost" step="0.01" placeholder="typical" value="${+b.cost||''}"><input type="number" id="m-hi" step="0.01" placeholder="high" value="${+b.hi||''}"></div></div>`;
 }
-function addBillGo(grp){
-  const n=$('m-name').value.trim(); if(!n)return;
-  S.bills[grp].push({id:Date.now(),name:n,due:$('m-due').value,cost:parseFloat($('m-cost').value)||0,
-    hi:parseFloat($('m-hi').value)||0,acct:$('m-acct').value,pay:$('m-pay-t').value,act:{}});
+function billRead(){
+  return {name:$('m-name').value.trim(),grp:$('m-grp').value,due:$('m-due').value.trim(),payAcct:$('m-payacct').value,
+    pay:$('m-pay-t').value,cost:parseFloat($('m-cost').value)||0,hi:parseFloat($('m-hi').value)||0};
+}
+function billOpen(grp,id){
+  const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
+  const st=billStats(b);
+  const hist=st.acts.slice(-6).reverse().map(x=>{
+    const arr=Array.isArray(b.act[x.key])?b.act[x.key]:[+b.act[x.key]];
+    return `<div class="pay-item"><span>${x.ym}</span><span>${arr.map((v,i)=>fmt(v)+` <button class="del" onclick="billPayDel('${grp}',${id},'${x.key}',${i})">×</button>`).join(' ')}</span></div>`;
+  }).join('');
+  openModal(`<h3>${esc(b.name)}</h3>
+    <div class="note-line" style="margin-bottom:8px">Budget <b>${fmt0(st.budget)}</b>${st.fromActuals?' from the last 3 payments':' (estimate)'}${st.avg?' · avg '+fmt0(st.avg):''}</div>
+    <div class="field"><label>Log a payment</label><div style="display:flex;gap:6px"><input type="month" id="m-pay-ym" value="${ymNow()}" style="flex:1"><input type="number" id="m-pay" step="0.01" placeholder="amount" style="flex:1" onkeydown="if(event.key==='Enter')billPayAdd('${grp}',${id})"><button class="small-btn primary" onclick="billPayAdd('${grp}',${id})">Log</button></div></div>
+    <div class="pay-list">${hist||'<div class="empty">No payments logged yet.</div>'}</div>
+    ${billFieldsHTML(Object.assign({grp},b))}
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="billSaveGo('${grp}',${id})">Save</button></div>
+    <div class="row" style="margin-top:6px"><button style="color:var(--belt)" onclick="delBill('${grp}',${id})">Delete expense</button></div>`);
+}
+function billPayAdd(grp,id){
+  const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
+  const v=parseFloat($('m-pay').value), ym=$('m-pay-ym').value||ymNow();
+  if(isNaN(v)||v<=0||!/^\d{4}-\d{2}$/.test(ym))return;
+  const k=actKey(b,ym);
+  if(typeof b.act[k]==='number')b.act[k]=[b.act[k]];
+  if(!b.act[k])b.act[k]=[];
+  b.act[k].push(v); save(); renderBills(); billOpen(grp,id); toast('Payment logged.');
+}
+function billPayDel(grp,id,key,i){
+  const b=S.bills[grp].find(x=>x.id===id); if(!b||!b.act||!b.act[key])return;
+  if(typeof b.act[key]==='number')b.act[key]=[b.act[key]];
+  b.act[key].splice(i,1); if(!b.act[key].length)delete b.act[key];
+  save(); renderBills(); billOpen(grp,id);
+}
+function billSaveGo(grp,id){
+  const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
+  const f=billRead(); if(!f.name)return;
+  Object.assign(b,{name:f.name,due:f.due,payAcct:f.payAcct,pay:f.pay,cost:f.cost,hi:f.hi});
+  if(f.grp!==grp){ S.bills[grp]=S.bills[grp].filter(x=>x.id!==id); S.bills[f.grp].push(b); }
+  save(); closeModal(); renderBills(); toast('Saved.');
+}
+function addBill(){
+  openModal(`<h3>Add expense</h3>${billFieldsHTML({grp:'school',pay:'auto'})}
+    <div class="row"><button onclick="closeModal()">Cancel</button><button class="go" onclick="addBillGo()">Add</button></div>`);
+  setTimeout(()=>$('m-name').focus(),50);
+}
+function addBillGo(){
+  const f=billRead(); if(!f.name)return;
+  S.bills[f.grp].push({id:Date.now(),name:f.name,due:f.due,cost:f.cost,hi:f.hi,acct:'',payAcct:f.payAcct,pay:f.pay,act:{}});
   save(); closeModal(); renderBills();
 }
-function delBill(grp,id){S.bills[grp]=S.bills[grp].filter(b=>b.id!==id); save(); renderBills();}
+function delBill(grp,id){
+  const b=S.bills[grp].find(x=>x.id===id); if(!b)return;
+  openModal(`<h3>Delete "${esc(b.name)}"?</h3><div class="note-line">Its payment history goes with it.</div>
+    <div class="row"><button onclick="billOpen('${grp}',${id})">Keep</button><button class="go" style="background:var(--belt);border-color:var(--belt)" onclick="delBillGo('${grp}',${id})">Delete</button></div>`);
+}
+function delBillGo(grp,id){ S.bills[grp]=S.bills[grp].filter(b=>b.id!==id); save(); closeModal(); renderBills(); }
 
 // ── DEBT ───────────────────────────────────────────────────────────
 const ST_LABEL={bills:['Bill card — paid weekly','#1d4f9e'],payoff:['Payoff target','var(--belt)'],close:['Payoff → CLOSE (fee card)','var(--belt)'],park:['Parked + frozen','var(--money)']};
@@ -1124,11 +1176,10 @@ function txnBillGo(i){
   const t=bankRec().inbox[i]; if(!t)return;
   const parts=$('m-bill').value.split(':');
   const bl=S.bills[parts[0]].find(x=>x.id===+parts[1]); if(!bl)return;
-  const mo=(t.posted?new Date(t.posted*1000):new Date()).getMonth()+1;
-  if(!bl.act)bl.act={};
-  if(typeof bl.act[mo]==='number')bl.act[mo]=[bl.act[mo]];
-  if(!bl.act[mo])bl.act[mo]=[];
-  bl.act[mo].push(Math.abs(t.amount));
+  const k=actKey(bl,ymOf(t.posted?new Date(t.posted*1000):new Date()));
+  if(typeof bl.act[k]==='number')bl.act[k]=[bl.act[k]];
+  if(!bl.act[k])bl.act[k]=[];
+  bl.act[k].push(Math.abs(t.amount));
   bankRec().inbox.splice(i,1);
   save(); closeModal(); renderBanks(); renderBills(); toast('Payment logged.');
 }
