@@ -1760,6 +1760,10 @@ function sparkCollected(sinceTs){
     b.inbox.forEach(t=>{ if(!t.pending&&t.amount>0&&t.acctId){ const k=t.acctId+'|seed|'+t.posted+'|'+t.amount; if(!b.inflows[k])b.inflows[k]={posted:t.posted,amount:t.amount,desc:t.desc,acctId:t.acctId}; } });
     b.inflowsSeeded=true;
   }
+  // A seeded row and its live-feed twin (same account, day, amount, desc) count once: drop the seed copy.
+  const fp=x=>x.acctId+'|'+x.posted+'|'+x.amount+'|'+(x.desc||'');
+  const live=new Set(Object.entries(b.inflows).filter(([k])=>!k.includes('|seed|')).map(([,x])=>fp(x)));
+  Object.keys(b.inflows).forEach(k=>{ if(k.includes('|seed|')&&live.has(fp(b.inflows[k])))delete b.inflows[k]; });
   return Object.values(b.inflows).filter(x=>SPARK_DEP.test(x.desc||'')&&(x.posted||0)>=sinceTs).reduce((t,x)=>t+(+x.amount||0),0);
 }
 function stripeRec(){
