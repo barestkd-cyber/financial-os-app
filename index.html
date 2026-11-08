@@ -70,7 +70,7 @@ header{
 .head-stats{display:flex; gap:18px; margin-left:auto; align-items:baseline; flex-wrap:wrap;}
 .hs{display:flex; flex-direction:column;}
 .hs .l{font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--muted);}
-.hs .v{font-weight:700; font-variant-numeric:tabular-nums;}
+.hs .v{font-weight:800; font-size:17px; font-variant-numeric:tabular-nums;}
 .hs .v.red{color:var(--belt);}
 .hs .v.green{color:var(--money);}
 .tools{display:flex; gap:6px;}
@@ -168,7 +168,7 @@ tr:hover td{background:var(--hover);}
 .fund-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px;}
 .fund{background:var(--panel); border:1px solid var(--rule); border-radius:6px; padding:10px 12px;}
 .fund .name{font-weight:700; font-size:13px; display:flex; justify-content:space-between; align-items:baseline;}
-.fund .nums{font-size:12px; color:var(--muted); margin:3px 0 6px; font-variant-numeric:tabular-nums;}
+.fund .nums{font-size:16px; font-weight:700; color:var(--ink); margin:3px 0 6px; font-variant-numeric:tabular-nums;}
 .fund .nums b{color:var(--ink);}
 .fund .bar{height:6px; background:var(--soft); border-radius:3px; overflow:hidden;}
 .fund .fill{height:6px; border-radius:3px; background:var(--money); transition:width .3s;}
@@ -180,7 +180,7 @@ tr:hover td{background:var(--hover);}
 /* ALLOCATION ROWS */
 .alloc{display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--soft);}
 .alloc:last-child{border-bottom:none;}
-.alloc .amt{font-weight:700; min-width:64px; text-align:right; font-variant-numeric:tabular-nums;}
+.alloc .amt{font-weight:800; font-size:17px; min-width:84px; text-align:right; font-variant-numeric:tabular-nums;}
 .alloc .what{flex:1;}
 .alloc .what .d{font-size:11px; color:var(--muted);}
 .surplus-box{
@@ -199,7 +199,7 @@ tr:hover td{background:var(--hover);}
 .bud-bar{flex:1; height:8px; background:var(--soft); border-radius:4px; overflow:hidden;}
 .bud-fill{height:8px; border-radius:4px; background:var(--money);}
 .bud-fill.over{background:var(--belt);}
-.bud-nums{width:150px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums;}
+.bud-nums{width:150px; text-align:right; font-size:16px; font-weight:700; font-variant-numeric:tabular-nums;}
 .bud-nums .left{color:var(--muted); font-size:10px;}
 
 /* MODAL */
@@ -236,10 +236,10 @@ tr:hover td{background:var(--hover);}
 .acct:hover{background:var(--hover);}
 .acct .nm{font-weight:700;}
 .acct .sub{font-size:11px; color:var(--muted); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
-.acct .bal{margin-left:auto; text-align:right; font-weight:800; font-size:15px; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.acct .bal{margin-left:auto; text-align:right; font-weight:800; font-size:21px; font-variant-numeric:tabular-nums; white-space:nowrap;}
 .acct .bal.neg{color:var(--belt);}
-.acct .bal .asof{display:block; font-size:9px; font-weight:500; color:var(--muted);}
-.grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:12px; color:var(--ink);}
+.acct .bal .asof{display:block; font-size:11px; font-weight:500; color:var(--muted);}
+.grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:15px; font-weight:800; color:var(--ink);}
 .grp-tot.neg{color:var(--belt);}
 .exp{display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .exp:last-child{border-bottom:none;}
@@ -250,7 +250,7 @@ tr:hover td{background:var(--hover);}
 .exp .sub{font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; min-width:0;}
 .exp.paid .nm{color:var(--muted); font-weight:600;}
 .exp .m{width:150px; flex:none;}
-.exp .pair{font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right;}
+.exp .pair{font-size:17px; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right;}
 .exp .pair .in{color:var(--money); font-weight:800;}
 .exp .pair .in.neg{color:var(--belt);}
 .exp .pair .of{color:var(--ink); font-weight:700;}
@@ -261,8 +261,8 @@ tr:hover td{background:var(--hover);}
 .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px;}
 .tile{background:var(--panel); border:1px solid var(--rule); border-radius:6px; padding:8px 10px;}
 .tile .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
-.tile .big{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums;}
-.tile .in{font-size:11px; color:var(--money); font-weight:600; font-variant-numeric:tabular-nums;}
+.tile .big{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums;}
+.tile .in{font-size:13px; color:var(--money); font-weight:700; font-variant-numeric:tabular-nums;}
 .fund .next{font-size:10px; color:var(--muted); margin-top:5px;}
 .fund .next b{color:var(--ink);}
 .fund.behind{border-color:var(--belt);}
@@ -282,9 +282,14 @@ tr:hover td{background:var(--hover);}
 .inc{display:flex; gap:10px; flex-wrap:wrap;}
 .inc .cell{flex:1; min-width:120px;}
 .inc .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
-.inc .amt{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money);}
+.inc .amt{font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money);}
 .inc .amt.zero{color:var(--faint);}
 .inc .when{font-size:11px; color:var(--muted);}
+.src{display:flex; align-items:baseline; gap:8px; padding:10px 0 2px;}
+.src .nm{font-weight:700;}
+.src .sub{font-size:11px; color:var(--muted);}
+.inc{padding:6px 0 10px;}
+.down{font-size:11px; color:var(--muted); padding:6px 0; border-top:1px solid var(--soft); border-bottom:1px solid var(--soft);}
 
 /* AUTH GATE */
 #app{display:none; flex:1; min-height:0; overflow:hidden;}
@@ -600,7 +605,7 @@ function defaults(){return {
   months:[],
   bank:{url:'',lastSync:0,accounts:[],inbox:[],seen:{}},
   accounts:[],
-  stripe:{key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''},
+  stripe:{key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,wk:0,mo:0,err:''},
   budgetBucket:0,
   homeView:'flow',
 };}
@@ -1530,14 +1535,21 @@ function renderIncoming(hubs){
         <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>
       ${hubRows}${noHub}</div></div>`;
   }
-  // The hub account row right below the strip is where the payouts land, so no "Lands in" cell. Stripe settings live in + Add Account.
+  // Income = the sources (Stripe today; projected tuition from the CRM is the next build), then an arrow
+  // down to the account the money lands in. The header total is money collected this month, not the
+  // hub balance (Race, 2026-11-07: the hub balance is not what I make). Stripe settings live in + Add Account.
   const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
-  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div>
+  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${fmt(s.mo||0)} this month</span></div>
     <div class="card-b" style="padding:0 12px">${s.err?'<div class="note-line" style="color:var(--amber);padding:8px 0 0">'+esc(s.err)+'</div>':''}
-      <div class="inc" style="padding:10px 0;border-bottom:1px solid var(--soft)">
-        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe payouts</div></div>
+      <div class="src"><span class="nm">Stripe</span><span class="sub">Bares Taekwondo Fitness payouts</span></div>
+      <div class="inc">
+        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div></div>
         <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:''}</div></div>
+        <div class="cell"><div class="lbl">This week</div><div class="amt ${s.wk?'':'zero'}">${fmt(s.wk||0)}</div><div class="when">since Monday</div></div>
+        <div class="cell"><div class="lbl">This month</div><div class="amt ${s.mo?'':'zero'}">${fmt(s.mo||0)}</div></div>
+        <div class="cell"><div class="lbl">Projected 30 days</div><div class="amt zero">&ndash;</div><div class="when">tuition, CRM link next</div></div>
       </div>
+      <div class="down">&darr; lands in</div>
       ${hubRows}${noHub}</div></div>`;
 }
 function homeView(v){ S.homeView=v; save(); renderHome(); }
@@ -1594,7 +1606,7 @@ function acctOpen(i){
   openModal(`<h3>${esc(a.nick||a.name)}</h3>
     <div class="note-line" style="margin-bottom:8px">${esc(a.inst||'')}${a.inst?' · ':''}${ACCT_TYPES[a.type]||'Other'} · <span class="tag ${st[0]}">${st[1]}</span>
       ${synced&&a.stale?'<br>Not returned by the last sync. Relink this bank at bridge.simplefin.org.':''}</div>
-    <div style="font-size:20px;font-weight:800;margin-bottom:10px;color:${bal<0?'var(--belt)':'var(--ink)'}">${fmt(isDebtType(a.type)?Math.abs(bal):bal)}${isDebtType(a.type)&&bal<0?' <span style="font-size:11px;font-weight:500;color:var(--muted)">owed</span>':''}</div>
+    <div style="font-size:28px;font-weight:800;margin-bottom:10px;color:${bal<0?'var(--belt)':'var(--ink)'}">${fmt(isDebtType(a.type)?Math.abs(bal):bal)}${isDebtType(a.type)&&bal<0?' <span style="font-size:11px;font-weight:500;color:var(--muted)">owed</span>':''}</div>
     <div class="field"><label>${synced?'Nickname (bank name: '+esc(a.name)+')':'Name'}</label><input id="m-name" value="${esc(synced?a.nick:a.name)}"></div>
     ${synced?'':`<div class="field"><label>Institution</label><input id="m-inst" value="${esc(a.inst)}"></div>`}
     <div class="field"><label>Type</label><select id="m-type" onchange="acctBalLabel()">${acctTypeOpts(a.type)}</select></div>
@@ -1676,14 +1688,20 @@ function addManualGo(){
 // Stripe has created that the bank hasn't received (status pending / in_transit).
 // The key is a credential: synced in the RLS row, stripped from exports.
 function stripeRec(){
-  if(!S.stripe)S.stripe={key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,err:''};
+  if(!S.stripe)S.stripe={key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,wk:0,mo:0,err:''};
   return S.stripe;
 }
 async function stripeSync(manual){
   const s=stripeRec(); if(!s.key)return;
   const h={headers:{Authorization:'Bearer '+s.key}};
   try{
-    const [rb,rp]=await Promise.all([fetch('https://api.stripe.com/v1/balance',h),fetch('https://api.stripe.com/v1/payouts?limit=20',h)]);
+    // Collected = payouts that have landed (status paid), summed since Monday (Money Monday week) and
+    // since the 1st. One payouts call covers both: from whichever start is earlier, up to 100 payouts.
+    const d=new Date(); d.setHours(0,0,0,0);
+    const monthStart=Math.floor(new Date(d.getFullYear(),d.getMonth(),1).getTime()/1000);
+    const wk=new Date(d); wk.setDate(d.getDate()-((d.getDay()+6)%7)); const weekStart=Math.floor(wk.getTime()/1000);
+    const since=Math.min(monthStart,weekStart);
+    const [rb,rp]=await Promise.all([fetch('https://api.stripe.com/v1/balance',h),fetch('https://api.stripe.com/v1/payouts?limit=100&arrival_date[gte]='+since,h)]);
     if(rb.status===401||rp.status===401)throw new Error('Stripe rejected the key. Create a new restricted key and paste it again.');
     if(!rb.ok||!rp.ok)throw new Error('Stripe returned an error. Try again later.');
     const bal=await rb.json(), po=await rp.json();
@@ -1692,6 +1710,9 @@ async function stripeSync(manual){
     const moving=(po.data||[]).filter(p=>p.status==='pending'||p.status==='in_transit');
     s.onWay=moving.reduce((t,p)=>t+(p.amount||0),0)/100;
     s.arrival=moving.length?Math.min(...moving.map(p=>p.arrival_date||0).filter(Boolean)):0;
+    const landed=(po.data||[]).filter(p=>p.status==='paid'&&p.currency==='usd');
+    s.wk=landed.filter(p=>(p.arrival_date||0)>=weekStart).reduce((t,p)=>t+(p.amount||0),0)/100;
+    s.mo=landed.filter(p=>(p.arrival_date||0)>=monthStart).reduce((t,p)=>t+(p.amount||0),0)/100;
     s.err=''; s.lastSync=Date.now();
     save(); renderHome();
     if(manual)toast('Stripe up to date.');
