@@ -85,9 +85,10 @@ header{
 #app.authed{display:grid; grid-template-columns:170px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);}
 header{grid-column:1 / -1;}
 .tabs{grid-row:2; grid-column:1; display:flex; flex-direction:column; background:var(--panel); border-right:1px solid var(--rule); padding:10px 8px; overflow-y:auto;}
+/* Buttons share the sidebar's full height (Race, 2026-11-08: "squished to the top"). */
 .tab{
-  padding:9px 12px; font-size:12px; font-weight:600; color:var(--muted); border-radius:5px;
-  cursor:pointer; white-space:nowrap; margin-bottom:2px;
+  flex:1 1 0; min-height:40px; display:flex; align-items:center; padding:0 14px; font-size:13px; font-weight:600; color:var(--muted); border-radius:5px;
+  cursor:pointer; white-space:nowrap; margin-bottom:4px;
 }
 .tab:hover{color:var(--ink); background:var(--soft);}
 .tab.active{color:var(--belt); background:var(--belt-tint);}
@@ -351,6 +352,7 @@ tr:hover td{background:var(--hover);}
 <div id="nav-scrim" onclick="navToggle(false)"></div>
 <div class="tabs" id="nav">
   <div class="tab active" data-t="home" onclick="showTab('home')">Accounts</div>
+  <div class="tab" data-t="income" onclick="showTab('income')">Income</div>
   <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
   <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
   <div class="tab" data-t="funds" onclick="showTab('funds')">Buckets</div>
@@ -371,6 +373,17 @@ tr:hover td{background:var(--hover);}
     </div>
   </div>
   <div id="home-groups"></div>
+</div></div>
+
+<!-- INCOME (own tab, Race 2026-11-08: balances and income are different questions) -->
+<div class="page" id="p-income"><div class="wrap">
+  <div class="home-top">
+    <div><div class="home-q">Income</div><div class="home-sub" id="income-sub"></div></div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <button class="small-btn" onclick="syncAll(true)">Sync</button>
+    </div>
+  </div>
+  <div id="income-card"></div>
 </div></div>
 
 <!-- TODAY -->
@@ -708,7 +721,7 @@ function showTab(t){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   $('p-'+t).classList.add('active');
   // Stripe is checked with every bank sync (auto on open when the last sync is >6h old, or the Sync button).
-  if((t==='banks'||t==='home'||t==='txns')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
+  if((t==='banks'||t==='home'||t==='income'||t==='txns')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
 }
 function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); incomeSync(manual); }
 
@@ -1607,11 +1620,12 @@ function renderHome(){
   if(view==='bank'){
     html+=renderByBank(vis);
   }else{
-    html+=renderIncoming(hubs);
+    // Income has its own tab (2026-11-08); here the hub is just the first cash account, tagged.
+    const cashRows=hubs.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:'income lands here'})})).concat(savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
+    if(cashRows.length)html+=treeCard('Cash & savings',cashRows);
     if(disp.length){
       html+=treeCard('Outgoing',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})));
     }
-    if(savings.length)html+=treeCard('Savings & other',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
     if(loans.length)html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
     if(payoff.length)html+=treeCard('Debt payoff targets',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
   }
@@ -1622,6 +1636,15 @@ function renderHome(){
   $('home-groups').innerHTML=html;
   const n=vis.length, sn=vis.filter(x=>x.a.source==='synced').length;
   $('home-sub').textContent=n?`${n} account${n===1?'':'s'} · ${sn} synced · last sync ${b.lastSync?new Date(b.lastSync).toLocaleString():'never'}`:'';
+  renderIncome(hubs);
+}
+// Income tab: the Income card (CRM + Spark collected, projections, Stripe, lands-in hub). Rebuilt with
+// renderHome so every sync path (bank, Stripe, CRM) refreshes it.
+function renderIncome(hubs){
+  const el=$('income-card'); if(!el)return;
+  el.innerHTML=renderIncoming(hubs);
+  const inc=incomeRec();
+  $('income-sub').textContent=inc.lastSync?'CRM checked '+new Date(inc.lastSync).toLocaleString():'';
 }
 function acctTypeOpts(sel){ return Object.entries(ACCT_TYPES).map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join(''); }
 function acctBalLabel(){ const l=$('m-bal-l'), t=$('m-type'); if(l&&t)l.textContent=isDebtType(t.value)?'Amount owed':'Current balance'; }
