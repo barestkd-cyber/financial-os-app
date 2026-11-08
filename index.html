@@ -285,10 +285,15 @@ tr:hover td{background:var(--hover);}
 .inc .amt{font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money);}
 .inc .amt.zero{color:var(--faint);}
 .inc .when{font-size:11px; color:var(--muted);}
-.src{display:flex; align-items:baseline; gap:8px; padding:10px 0 2px;}
-.src .nm{font-weight:700;}
-.src .sub{font-size:11px; color:var(--muted);}
-.inc{padding:6px 0 10px;}
+.inc-big{padding:12px 0 6px;}
+.inc-big .n{font-size:36px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; color:var(--money);}
+.inc-big .n .zero{color:var(--faint);}
+.inc-big .l{font-size:12px; font-weight:600; margin-top:4px;}
+.inc-big .l .sub{font-weight:500; color:var(--muted); margin-left:8px;}
+.inc-proj{display:flex; gap:18px; flex-wrap:wrap; font-size:13px; color:var(--muted); padding:4px 0 8px; border-bottom:1px solid var(--soft);}
+.inc-proj b{color:var(--ink); font-size:16px; font-variant-numeric:tabular-nums;}
+.inc{padding:8px 0 10px;}
+.inc .amt .zero{color:var(--faint);}
 .down{font-size:11px; color:var(--muted); padding:6px 0; border-top:1px solid var(--soft); border-bottom:1px solid var(--soft);}
 
 /* AUTH GATE */
@@ -606,6 +611,7 @@ function defaults(){return {
   bank:{url:'',lastSync:0,accounts:[],inbox:[],seen:{}},
   accounts:[],
   stripe:{key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,wk:0,mo:0,err:''},
+  income:{lastSync:0,data:null,err:''},
   budgetBucket:0,
   homeView:'flow',
 };}
@@ -704,7 +710,7 @@ function showTab(t){
   // Stripe is checked with every bank sync (auto on open when the last sync is >6h old, or the Sync button).
   if((t==='banks'||t==='home'||t==='txns')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
 }
-function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); }
+function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); incomeSync(manual); }
 
 // ── TODAY ──────────────────────────────────────────────────────────
 function dayRec(){const d=todayStr(); if(!S.today[d])S.today[d]={checks:DAILY_ITEMS.map(()=>false),income:[],note:''}; return S.today[d];}
@@ -1238,6 +1244,7 @@ function bankRec(){
   if(!S.bank)S.bank={url:'',lastSync:0,accounts:[],inbox:[],seen:{}};
   if(!S.bank.seen)S.bank.seen={};
   if(!Array.isArray(S.bank.done))S.bank.done=[]; // fingerprints of logged/dismissed pending rows
+  if(!S.bank.inflows)S.bank.inflows={}; // posted deposits, keyed acctId|txnId: {posted,amount,desc,acctId}
   if(!S.bank.inbox)S.bank.inbox=[];
   if(!S.bank.accounts)S.bank.accounts=[];
   return S.bank;
@@ -1294,6 +1301,9 @@ async function bankSync(manual){
       const row={acct:a.name,acctId:a.id,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending};
       if(row.pending){ b.inbox.push(row); return; }
       const key=a.id+'|'+t.id;
+      // Deposit ledger (independent of the review inbox): posted inflows, so income collected
+      // through Spark can be summed from the bank feed. Kept 70 days.
+      if(row.amount>0&&!b.inflows[key])b.inflows[key]={posted:row.posted,amount:row.amount,desc:row.desc,acctId:a.id};
       if(b.seen[key])return;
       b.seen[key]=t.posted||now;
       const j=fpIdx(a.id,row.amount,row.posted);
@@ -1304,6 +1314,7 @@ async function bankSync(manual){
     const cutoff=now-180*86400;
     for(const k of Object.keys(b.seen)){ if(b.seen[k]<cutoff)delete b.seen[k]; }
     b.done=b.done.filter(f=>(f.posted||0)>=now-30*86400);
+    for(const k of Object.keys(b.inflows)){ if((b.inflows[k].posted||0)<now-70*86400)delete b.inflows[k]; }
     b.inbox.sort((x,y)=>(y.posted||0)-(x.posted||0));
     if(b.inbox.length>300)b.inbox.length=300;
     b.lastSync=Date.now();
@@ -1535,20 +1546,34 @@ function renderIncoming(hubs){
         <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>
       ${hubRows}${noHub}</div></div>`;
   }
-  // Income = the sources (Stripe today; projected tuition from the CRM is the next build), then an arrow
-  // down to the account the money lands in. The header total is money collected this month, not the
-  // hub balance (Race, 2026-11-07: the hub balance is not what I make). Stripe settings live in + Add Account.
+  // Income (Race, 2026-11-07/08): collected this month is the big number (all sales: CRM payments plus
+  // Spark deposits in the bank feed), then projected rest of month and full month, next 30 and last 30,
+  // Stripe on deck / on the way, a muted Spark line while members move over, then an arrow down to the
+  // account the money lands in. Stripe settings live in + Add Account.
+  const inc=incomeRec(), d=inc.data;
+  const now=new Date(); now.setHours(0,0,0,0);
+  const mStart=Math.floor(new Date(now.getFullYear(),now.getMonth(),1).getTime()/1000), d30=Math.floor(now.getTime()/1000)-30*86400;
+  const sparkMtd=sparkCollected(mStart), sparkLast30=sparkCollected(d30);
+  const n=v=>+v||0;
+  const mtd=d?n(d.crm_mtd)+sparkMtd:null;
+  const rest=d?n(d.crm_rest_month)+n(d.spark_rest_month):null;
+  const next30=d?n(d.crm_next30)+n(d.spark_next30):null;
+  const last30=d?n(d.crm_last30)+sparkLast30:null;
+  const money=v=>v===null?'<span class="zero">&ndash;</span>':fmt(v);
   const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
-  return `<div class="card ${s.err?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${fmt(s.mo||0)} this month</span></div>
-    <div class="card-b" style="padding:0 12px">${s.err?'<div class="note-line" style="color:var(--amber);padding:8px 0 0">'+esc(s.err)+'</div>':''}
-      <div class="src"><span class="nm">Stripe</span><span class="sub">Bares Taekwondo Fitness payouts</span></div>
+  const notes=[s.err?esc(s.err):'',inc.err?esc(inc.err):'',d&&n(d.stale_on_list)?n(d.stale_on_list)+' CRM membership'+(n(d.stale_on_list)===1?' is':'s are')+' past due, projection counts them as today':''].filter(Boolean);
+  return `<div class="card ${notes.length?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${d?fmt(mtd)+' this month':''}</span></div>
+    <div class="card-b" style="padding:0 12px">
+      <div class="inc-big"><div class="n">${money(mtd)}</div><div class="l">Collected this month${d?'<span class="sub">CRM '+fmt(n(d.crm_mtd))+' · Spark '+fmt(sparkMtd)+'</span>':'<span class="sub">tap Sync</span>'}</div></div>
+      <div class="inc-proj"><span>Projected, rest of month <b>${money(rest)}</b></span><span>Full month <b>${d?fmt(mtd+rest):'&ndash;'}</b></span></div>
       <div class="inc">
-        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div></div>
-        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:''}</div></div>
-        <div class="cell"><div class="lbl">This week</div><div class="amt ${s.wk?'':'zero'}">${fmt(s.wk||0)}</div><div class="when">since Monday</div></div>
-        <div class="cell"><div class="lbl">This month</div><div class="amt ${s.mo?'':'zero'}">${fmt(s.mo||0)}</div></div>
-        <div class="cell"><div class="lbl">Projected 30 days</div><div class="amt zero">&ndash;</div><div class="when">tuition, CRM link next</div></div>
+        <div class="cell"><div class="lbl">Next 30 days</div><div class="amt">${money(next30)}</div><div class="when">projected</div></div>
+        <div class="cell"><div class="lbl">Last 30 days</div><div class="amt">${money(last30)}</div><div class="when">collected</div></div>
+        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div>
+        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div>
       </div>
+      ${d&&n(d.spark_members)?`<div class="tree-note">Spark, still moving over: ${n(d.spark_members)} member${n(d.spark_members)===1?'':'s'}, ${fmt0(n(d.spark_monthly))}/mo expected. CRM bills ${n(d.crm_members)}.</div>`:''}
+      ${notes.map(x=>'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+x+'</div>').join('')}
       <div class="down">&darr; lands in</div>
       ${hubRows}${noHub}</div></div>`;
 }
@@ -1687,6 +1712,33 @@ function addManualGo(){
 // pending + available balance (collected, not yet paid out). On the way = payouts
 // Stripe has created that the bank hasn't received (status pending / in_transit).
 // The key is a credential: synced in the RLS row, stripped from exports.
+// ── INCOME (CRM totals via the fos_income() function in the shared project) ──
+// Returns aggregates only: collected (pos_payments), projected (memberships on the CRM
+// autopay list by next bill date; Spark-billed members by bill day while they move over).
+const SPARK_DEP=/MERCHANT BANKCARD DEPOSIT/i; // how Spark's processor lands in Grizzly MA Checking (Race, 2026-11-08)
+function incomeRec(){
+  if(!S.income)S.income={lastSync:0,data:null,err:''};
+  return S.income;
+}
+async function incomeSync(manual){
+  const r=incomeRec();
+  try{
+    const {data,error}=await sb.rpc('fos_income');
+    if(error)throw error;
+    r.data=data; r.err=''; r.lastSync=Date.now();
+    save(); renderHome();
+  }catch(e){ r.err='CRM income unavailable: '+String(e.message||e).slice(0,120); save(); renderHome(); if(manual)toast('CRM income check failed.'); }
+}
+// Spark money collected = posted bank deposits matching SPARK_DEP since a unix-seconds cutoff.
+// The ledger is backfilled once from whatever is still in the review inbox.
+function sparkCollected(sinceTs){
+  const b=bankRec();
+  if(!b.inflowsSeeded){
+    b.inbox.forEach(t=>{ if(!t.pending&&t.amount>0&&t.acctId){ const k=t.acctId+'|seed|'+t.posted+'|'+t.amount; if(!b.inflows[k])b.inflows[k]={posted:t.posted,amount:t.amount,desc:t.desc,acctId:t.acctId}; } });
+    b.inflowsSeeded=true;
+  }
+  return Object.values(b.inflows).filter(x=>SPARK_DEP.test(x.desc||'')&&(x.posted||0)>=sinceTs).reduce((t,x)=>t+(+x.amount||0),0);
+}
 function stripeRec(){
   if(!S.stripe)S.stripe={key:'',lastSync:0,onDeck:0,onWay:0,arrival:0,wk:0,mo:0,err:''};
   return S.stripe;
