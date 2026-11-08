@@ -1546,18 +1546,15 @@ function treeCard(title,rows,opts){
   return `<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
     <div class="card-b" style="padding:0 12px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
 }
-// Income card: the Stripe strip (On deck / On the way / Lands in) followed by the hub account itself,
-// so the account income lands in is part of Income rather than a separate section.
-function renderIncoming(hubs){
+// Income card: income only, no account balances (Race, 2026-11-08: "separate income and accounts").
+// The hub account is tagged "income lands here" on the Accounts tab instead.
+function renderIncoming(){
   const s=stripeRec();
-  const hubRows=hubs.map(x=>acctRowHTML(x.a,x.i)).join('');
-  const hubTot=hubs.reduce((t,x)=>t+(+x.a.balance||0),0);
-  const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
   if(!s.key){
-    return `<div class="card"><div class="card-h"><span>Income</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div><div class="card-b" style="padding:0 12px">
+    return `<div class="card"><div class="card-h"><span>Income</span></div><div class="card-b" style="padding:0 12px">
       <div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
         <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>
-      ${hubRows}${noHub}</div></div>`;
+      </div></div>`;
   }
   // Income (Race, 2026-11-07/08): collected this month is the big number (all sales: CRM payments plus
   // Spark deposits in the bank feed), then projected rest of month and full month, next 30 and last 30,
@@ -1587,8 +1584,24 @@ function renderIncoming(hubs){
       </div>
       ${d&&n(d.spark_members)?`<div class="tree-note">Spark, still moving over: ${n(d.spark_members)} member${n(d.spark_members)===1?'':'s'}, ${fmt0(n(d.spark_monthly))}/mo expected. CRM bills ${n(d.crm_members)}.</div>`:''}
       ${notes.map(x=>'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+x+'</div>').join('')}
-      <div class="down">&darr; lands in</div>
-      ${hubRows}${noHub}</div></div>`;
+      </div></div>`;
+}
+// Accounts tab: money on its way in (Stripe) and the hub account it lands in.
+function renderIncomingCard(hubs){
+  const s=stripeRec();
+  const hubRows=hubs.map(x=>acctRowHTML(x.a,x.i)).join('');
+  const hubTot=hubs.reduce((t,x)=>t+(+x.a.balance||0),0);
+  const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
+  const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
+  const strip=s.key?`<div class="inc">
+        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div>
+        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div>
+      </div>${s.err?'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+esc(s.err)+'</div>':''}
+      <div class="down">&darr; lands in</div>`:
+    `<div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
+        <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>`;
+  return `<div class="card"><div class="card-h"><span>Incoming</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div>
+    <div class="card-b" style="padding:0 12px">${strip}${hubRows}${noHub}</div></div>`;
 }
 function homeView(v){ S.homeView=v; save(); renderHome(); }
 // By-bank view: one card per institution, every visible account under it, net total in the header.
@@ -1620,9 +1633,10 @@ function renderHome(){
   if(view==='bank'){
     html+=renderByBank(vis);
   }else{
-    // Income has its own tab (2026-11-08); here the hub is just the first cash account, tagged.
-    const cashRows=hubs.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:'income lands here'})})).concat(savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
-    if(cashRows.length)html+=treeCard('Cash & savings',cashRows);
+    // Income has its own tab (2026-11-08) but incoming money stays here (Race: "incoming can still be
+    // on accounts"): Stripe on deck / on the way, then the arrow down to the hub account it lands in.
+    html+=renderIncomingCard(hubs);
+    if(savings.length)html+=treeCard('Cash & savings',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
     if(disp.length){
       html+=treeCard('Outgoing',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})));
     }
@@ -1636,13 +1650,13 @@ function renderHome(){
   $('home-groups').innerHTML=html;
   const n=vis.length, sn=vis.filter(x=>x.a.source==='synced').length;
   $('home-sub').textContent=n?`${n} account${n===1?'':'s'} · ${sn} synced · last sync ${b.lastSync?new Date(b.lastSync).toLocaleString():'never'}`:'';
-  renderIncome(hubs);
+  renderIncome();
 }
-// Income tab: the Income card (CRM + Spark collected, projections, Stripe, lands-in hub). Rebuilt with
+// Income tab: the Income card (CRM + Spark collected, projections, Stripe). Rebuilt with
 // renderHome so every sync path (bank, Stripe, CRM) refreshes it.
-function renderIncome(hubs){
+function renderIncome(){
   const el=$('income-card'); if(!el)return;
-  el.innerHTML=renderIncoming(hubs);
+  el.innerHTML=renderIncoming();
   const inc=incomeRec();
   $('income-sub').textContent=inc.lastSync?'CRM checked '+new Date(inc.lastSync).toLocaleString():'';
 }
