@@ -194,6 +194,9 @@ tr:hover td{background:var(--hover);}
 .fund .name > span:first-child{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .fund .nums{font-size:24px; font-weight:800; color:var(--ink); margin:2px 0 6px; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:10px; flex-wrap:wrap; line-height:1.1;}
 .fund .nums b{color:var(--ink);}
+/* Target number: yellow until the bucket reaches it, then green (Race, 2026-11-08). Current number stays ink. */
+.fund .nums .tgt{color:var(--amber);}
+.fund.full .nums .tgt{color:var(--money);}
 .fund .kind{font-size:12px; font-weight:700; padding:2px 10px; border-radius:999px; border:1px solid currentColor; line-height:1.4;}
 .fund .bar{height:8px; background:var(--soft); border-radius:4px; overflow:hidden; border:1px solid var(--rule);}
 .fund .fill{height:8px; border-radius:4px; background:var(--money); transition:width .3s;}
@@ -952,7 +955,7 @@ function bucketCardHTML(grp,b){
     `${ico('cal')}<span><b>${fmt0(p.weekly)}</b> on ${mon}${b.due?' · due '+esc(b.due):''}</span>`;
   return `<div class="fund ${full?'full':''} ${p.behind?'behind':''}">
     <div class="name"><span>${esc(b.name)}</span></div>
-    <div class="nums"><span><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt(p.bucket)}</b>${p.cap?' of '+fmt0(p.cap):''}</span><span class="kind" style="color:${k[1]}">${k[0]}</span></div>
+    <div class="nums"><span><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt(p.bucket)}</b>${p.cap?' of <span class="tgt">'+fmt0(p.cap)+'</span>':''}</span><span class="kind" style="color:${k[1]}">${k[0]}</span></div>
     ${p.cap?`<div class="bar"><div class="fill" style="width:${pct}%"></div></div>`:''}
     <div class="foot"><div class="next">${next}</div>
       <button class="ib green" title="Add" onclick="bucketMove('${grp}',${b.id},1)">${ico('plus')}</button>
@@ -979,7 +982,7 @@ function budgetBucketCardHTML(){
   const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   return `<div class="fund ${amt>0&&inB>=amt?'full':''}">
     <div class="name"><span>Spending budget</span></div>
-    <div class="nums"><span><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt(inB)}</b> of ${fmt0(amt)}</span><span class="kind" style="color:var(--amber)">Average</span></div>
+    <div class="nums"><span><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt(inB)}</b> of <span class="tgt">${fmt0(amt)}</span></span><span class="kind" style="color:var(--amber)">Average</span></div>
     <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
     <div class="foot"><div class="next">${ico('cal')}<span><b>${fmt0(amt*12/52)}</b> on ${mon}</span></div>
       <button class="ib green" title="Add" onclick="budgetBucketMove(1)">${ico('plus')}</button>
@@ -1008,7 +1011,7 @@ function renderFunds(){
     const full=f.tgt>0&&f.cur>=f.tgt;
     return `<div class="fund ${full?'full':''}">
       <div class="name"><span>${esc(f.name)}</span></div>
-      <div class="nums"><span><b>${fmt(f.cur)}</b>${f.tgt>0?' of '+fmt0(f.tgt):''}</span></div>
+      <div class="nums"><span><b>${fmt(f.cur)}</b>${f.tgt>0?' of <span class="tgt">'+fmt0(f.tgt)+'</span>':''}</span></div>
       <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
       <div class="foot"><div class="next">${f.note?esc(f.note):(f.tgt>0?fmt0(Math.max(0,f.tgt-f.cur))+' to go':'Open-ended')}</div>
         <button class="ib green" title="Add" onclick="fundMove(${f.id},1)">${ico('plus')}</button>
