@@ -189,7 +189,19 @@ tr:hover td{background:var(--hover);}
 /* Buckets (redesign 2026-11-08, Race's mockup "but shorter"): name + BEHIND/FUNDED pill, "$in of $cap" + type pill,
    bar, one footer line (next Monday amount · due) with icon buttons Add / Take / Edit. */
 .fund-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:10px;}
-.fund{--ac:var(--rule); --ac-tint:var(--soft); background:var(--panel); border:1px solid var(--ac); border-radius:14px; padding:10px 14px 10px; box-shadow:var(--glow) var(--ac-tint);}
+.fund{--ac:var(--rule); --ac-tint:var(--soft); background:var(--panel); border:1px solid var(--ac); border-radius:14px; padding:9px 12px; box-shadow:var(--glow) var(--ac-tint);}
+/* Three lines (Race, 2026-11-08 "shorter still"): dot + name ... current / target, the bar, the footer.
+   Type is the dot color; the border color says behind (red) or funded (green). */
+.fund .top{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+.fund .top .dot{width:9px; height:9px; border-radius:50%; flex:none;}
+.fund .top .nm{font-weight:800; font-size:17px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;}
+.fund .top .amt{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; flex:none;}
+.fund .top .amt b{color:var(--ink);}
+.fund .top .amt .of{color:var(--muted); font-weight:600; font-size:16px;}
+.fund .top .amt .tgt{color:var(--amber);}
+.fund.full .top .amt .tgt{color:var(--money);}
+.fund .foot .next .bh{color:var(--belt); font-weight:800;}
+.bk-sub{font-size:13px; color:var(--muted); margin:-4px 0 8px;}
 .fund .name{font-weight:800; font-size:19px; display:flex; justify-content:space-between; align-items:center; gap:8px; line-height:1.15;}
 .fund .name > span:first-child{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .fund .nums{font-size:24px; font-weight:800; color:var(--ink); margin:2px 0 6px; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:10px; flex-wrap:wrap; line-height:1.1;}
@@ -202,7 +214,8 @@ tr:hover td{background:var(--hover);}
 .fund .fill{height:8px; border-radius:4px; background:var(--money); transition:width .3s;}
 .fund.full{--ac:var(--money); --ac-tint:var(--money-tint);}
 .fund.full .name::after{content:'FUNDED'; font-size:12px; color:var(--money); font-weight:800; letter-spacing:.5px; padding:2px 10px; border:1px solid var(--money); border-radius:999px; background:var(--money-tint); flex:none;}
-.fund .foot{display:flex; align-items:center; gap:6px; margin-top:8px;}
+.fund .foot{display:flex; align-items:center; gap:6px; margin-top:7px;}
+.fund .foot .ib{width:32px; height:30px; font-size:16px;}
 .fund .foot .next{flex:1; min-width:0; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .fund .foot .next b{color:var(--ink); font-size:15px;}
 .ib{width:36px; height:34px; border-radius:9px; border:1px solid var(--rule); background:var(--panel); color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex:none;}
@@ -510,6 +523,7 @@ tr:hover td{background:var(--hover);}
 <div class="page" id="p-funds"><div class="wrap">
   <div class="note-line" style="margin:0 0 6px; font-size:13px;">Every purchase has a bucket. If the bucket is empty, the answer is no, not "check the account."</div>
   <div class="sec-lbl" style="margin-top:6px"><span data-ico="layers"></span>Expense buckets</div>
+  <div class="bk-sub" id="bk-sub"></div>
   <div class="fund-grid" id="bucket-grid"></div>
   <div class="sec-lbl"><span data-ico="safe"></span>Funds</div>
   <div class="fund-grid" id="fund-grid"></div>
@@ -948,14 +962,14 @@ function bucketPlan(b){
 function bucketCardHTML(grp,b){
   const p=bucketPlan(b), k=KIND[p.kind];
   const pct=p.cap>0?Math.max(0,Math.min(100,p.bucket/p.cap*100)):0, full=p.cap>0&&p.bucket>=p.cap;
-  const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
-  // One footer line: next Monday's amount and the due day. "Need this month" repeats the amount for a
-  // fixed bill, so it is gone (Race, 2026-11-08: "repeated info"); the bar shows how full the bucket is.
-  const next=p.kind==='asneeded'?'Put money in when you decide to.':
-    `${ico('cal')}<span><b>${fmt0(p.weekly)}</b> on ${mon}${b.due?' · due '+esc(b.due):''}</span>`;
+  // No repeats (Race, 2026-11-08): the type is the dot color, behind/funded is the border color (plus a
+  // red "Behind" word), and next Monday's date is shown once above the grid, so the footer is just
+  // this week's amount and the due day.
+  const next=p.kind==='asneeded'?'As needed':
+    `${p.behind?'<span class="bh">Behind</span> · ':''}<span><b>${fmt0(p.weekly)}</b> Mon${b.due?' · due '+esc(b.due):''}</span>`;
   return `<div class="fund ${full?'full':''} ${p.behind?'behind':''}">
-    <div class="name"><span>${esc(b.name)}</span></div>
-    <div class="nums"><span><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt(p.bucket)}</b>${p.cap?' of <span class="tgt">'+fmt0(p.cap)+'</span>':''}</span><span class="kind" style="color:${k[1]}">${k[0]}</span></div>
+    <div class="top"><span class="dot" style="background:${k[1]}" title="${k[0]}"></span><span class="nm">${esc(b.name)}</span>
+      <span class="amt"><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt0(p.bucket)}</b>${p.cap?'<span class="of"> / </span><span class="tgt">'+fmt0(p.cap)+'</span>':''}</span></div>
     ${p.cap?`<div class="bar"><div class="fill" style="width:${pct}%"></div></div>`:''}
     <div class="foot"><div class="next">${next}</div>
       <button class="ib green" title="Add" onclick="bucketMove('${grp}',${b.id},1)">${ico('plus')}</button>
@@ -979,12 +993,11 @@ function bucketMoveGo(grp,id,dir){
 }
 function budgetBucketCardHTML(){
   const amt=budgetTotal(), inB=+S.budgetBucket||0, pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
-  const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   return `<div class="fund ${amt>0&&inB>=amt?'full':''}">
-    <div class="name"><span>Spending budget</span></div>
-    <div class="nums"><span><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt(inB)}</b> of <span class="tgt">${fmt0(amt)}</span></span><span class="kind" style="color:var(--amber)">Average</span></div>
+    <div class="top"><span class="dot" style="background:var(--amber)" title="Average"></span><span class="nm">Spending budget</span>
+      <span class="amt"><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt0(inB)}</b><span class="of"> / </span><span class="tgt">${fmt0(amt)}</span></span></div>
     <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-    <div class="foot"><div class="next">${ico('cal')}<span><b>${fmt0(amt*12/52)}</b> on ${mon}</span></div>
+    <div class="foot"><div class="next"><span><b>${fmt0(amt*12/52)}</b> Mon</span></div>
       <button class="ib green" title="Add" onclick="budgetBucketMove(1)">${ico('plus')}</button>
       <button class="ib" title="Take" onclick="budgetBucketMove(-1)">${ico('minus')}</button>
       <button class="ib" title="Budget" onclick="showTab('budget')">${ico('pie')}</button>
@@ -1006,13 +1019,14 @@ function renderFunds(){
   const cards=EXP_GROUPS.flatMap(([grp])=>(S.bills[grp]||[]).map(b=>bucketCardHTML(grp,b)));
   cards.push(budgetBucketCardHTML());
   $('bucket-grid').innerHTML=cards.join('');
+  $('bk-sub').textContent='This Monday: '+nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   $('fund-grid').innerHTML=S.funds.map(f=>{
     const pct=f.tgt>0?Math.min(100,f.cur/f.tgt*100):0;
     const full=f.tgt>0&&f.cur>=f.tgt;
     return `<div class="fund ${full?'full':''}">
-      <div class="name"><span>${esc(f.name)}</span></div>
-      <div class="nums"><span><b>${fmt(f.cur)}</b>${f.tgt>0?' of <span class="tgt">'+fmt0(f.tgt)+'</span>':''}</span></div>
-      <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="top"><span class="nm">${esc(f.name)}</span>
+        <span class="amt"><b>${fmt0(f.cur)}</b>${f.tgt>0?'<span class="of"> / </span><span class="tgt">'+fmt0(f.tgt)+'</span>':''}</span></div>
+      ${f.tgt>0?`<div class="bar"><div class="fill" style="width:${pct}%"></div></div>`:''}
       <div class="foot"><div class="next">${f.note?esc(f.note):(f.tgt>0?fmt0(Math.max(0,f.tgt-f.cur))+' to go':'Open-ended')}</div>
         <button class="ib green" title="Add" onclick="fundMove(${f.id},1)">${ico('plus')}</button>
         <button class="ib" title="Take" onclick="fundMove(${f.id},-1)">${ico('minus')}</button>
