@@ -1627,6 +1627,16 @@ function bankPasteGo(){
 // transactions and virtual buckets will hang off these ids later.
 const ACCT_TYPES={checking:'Checking',savings:'Savings',cash:'Cash',credit:'Credit card',loan:'Loan',other:'Other'};
 const isDebtType=t=>t==='credit'||t==='loan';
+// Available vs ledger (Race, 2026-11-09: "available first, then spent and ledger"). For synced cash accounts
+// the bank's available balance is the spendable number. 0 with a non-zero ledger means "not reported"
+// (Altra, SoFi send that), so fall back to ledger. Debt accounts keep their own logic.
+function acctAvail(a){
+  if(isDebtType(a.type)||a.source!=='synced'||a.avail===null||a.avail===undefined||a.avail==='')return null;
+  const n=+a.avail; if(isNaN(n))return null;
+  if(Math.abs(n)<0.005&&Math.abs(+a.balance||0)>0.005)return null;
+  return n;
+}
+function acctNow(a){ const v=acctAvail(a); return v===null?(+a.balance||0):v; }
 function acctRec(){
   if(!S.accounts){
     // First load on a pre-registry save: derive from the existing sync snapshot. Not a reseed.
@@ -1663,13 +1673,17 @@ function acctRowHTML(a,i,extra){
     if(+a.limit>0)avail=fmt0(Math.max(0,+a.limit-Math.abs(bal)))+' available';
     else if(a.source==='synced'&&Math.abs(+a.avail||0)>0)avail=fmt0(Math.abs(+a.avail))+' available';
   }
+  // Cash accounts: available is the big number; spent (ledger minus available) and ledger sit under it.
+  const av=acctAvail(a), diff=av===null?0:bal-av;
+  const big=av===null?bal:av;
+  if(av!==null&&Math.abs(diff)>0.005)avail=(diff>0?fmt(diff)+' spent':fmt(-diff)+' arriving')+' · '+fmt(bal)+' ledger';
   const sub2=[debt&&bal<0?'owed':'',avail].filter(Boolean).join(' · ');
   const x=extra||{};
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
     <span class="icb">${ico(acctIco(a))}</span>
     <div><div class="nm">${esc(a.nick||a.name)}</div>
       <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
-    <div class="bal ${bal<0?'neg':''}">${fmt(debt?Math.abs(bal):bal)}${sub2?'<span class="asof">'+sub2+'</span>':''}</div>
+    <div class="bal ${big<0?'neg':''}">${debt?fmt(Math.abs(bal)):(big<0?'-':'')+fmt(Math.abs(big))}${sub2?'<span class="asof">'+sub2+'</span>':''}</div>
   </div>`;
 }
 // Money tree: Income -> Hub -> Dispatch (with the cards each one pays) -> Savings -> Loans -> Payoff targets.
@@ -1678,7 +1692,7 @@ function acctRowHTML(a,i,extra){
 function acctLabel(a){ return a?(a.nick||a.name):''; }
 // opts: debt (owed wording), ac (green|gold|red|grey accent), ico (header icon), before/after html.
 function treeCard(title,rows,opts){
-  const o=opts||{}, tot=rows.reduce((s,x)=>s+(+x.a.balance||0),0);
+  const o=opts||{}, tot=rows.reduce((s,x)=>s+acctNow(x.a),0);
   const totTxt=o.debt?fmt(Math.abs(tot))+(tot<0?' owed':''):(tot<0?'-':'')+fmt(Math.abs(tot));
   return `<div class="card ac-${o.ac||'grey'}"><div class="card-h"><span class="ttl"><span class="icb ac">${ico(o.ico||'bank')}</span><span>${title}</span></span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
     <div class="card-b" style="padding:0 14px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
@@ -1727,7 +1741,7 @@ function renderIncoming(){
 function renderIncomingCard(hubs){
   const s=stripeRec();
   const hubRows=hubs.map(x=>acctRowHTML(x.a,x.i)).join('');
-  const hubTot=hubs.reduce((t,x)=>t+(+x.a.balance||0),0);
+  const hubTot=hubs.reduce((t,x)=>t+acctNow(x.a),0);
   const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
   const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
   const strip=s.key?`<div class="inc" style="padding:12px 0 10px">
@@ -1744,7 +1758,7 @@ function renderIncomingCard(hubs){
 // and the dispatch total (outgoing side).
 function summaryTile(vis){
   const cash=vis.filter(x=>!isDebtType(x.a.type));
-  const sum=l=>l.reduce((t,x)=>t+(+x.a.balance||0),0);
+  const sum=l=>l.reduce((t,x)=>t+acctNow(x.a),0);
   const tot=sum(cash), inc=sum(cash.filter(x=>x.a.role==='hub')), out=sum(cash.filter(x=>x.a.role==='dispatch'));
   return `<div class="card ac-red"><div class="sum">
     <span class="icb ac">${ico('coins')}</span>
@@ -1816,11 +1830,12 @@ function acctTypeOpts(sel){ return Object.entries(ACCT_TYPES).map(([k,v])=>`<opt
 function acctBalLabel(){ const l=$('m-bal-l'), t=$('m-type'); if(l&&t)l.textContent=isDebtType(t.value)?'Amount owed':'Current balance'; }
 function acctOpen(i){
   const a=acctRec()[i]; if(!a)return;
-  const synced=a.source==='synced', st=acctStatus(a), bal=+a.balance||0;
+  const synced=a.source==='synced', st=acctStatus(a), ledger=+a.balance||0, av=acctAvail(a), bal=av===null?ledger:av;
+  const avLine=av!==null&&Math.abs(ledger-av)>0.005?`<div class="note-line" style="margin:-6px 0 10px">Available. ${ledger-av>0?fmt(ledger-av)+' spent, not cleared':fmt(av-ledger)+' arriving'} · ${fmt(ledger)} ledger</div>`:'';
   openModal(`<h3>${esc(a.nick||a.name)}</h3>
     <div class="note-line" style="margin-bottom:8px">${esc(a.inst||'')}${a.inst?' · ':''}${ACCT_TYPES[a.type]||'Other'} · <span class="tag ${st[0]}">${st[1]}</span>
       ${synced&&a.stale?'<br>Not returned by the last sync. Relink this bank at bridge.simplefin.org.':''}</div>
-    <div style="font-size:28px;font-weight:800;margin-bottom:10px;color:${bal<0?'var(--belt)':'var(--ink)'}">${fmt(isDebtType(a.type)?Math.abs(bal):bal)}${isDebtType(a.type)&&bal<0?' <span style="font-size:11px;font-weight:500;color:var(--muted)">owed</span>':''}</div>
+    <div style="font-size:28px;font-weight:800;margin-bottom:10px;color:${bal<0?'var(--belt)':'var(--ink)'}">${fmt(isDebtType(a.type)?Math.abs(bal):bal)}${isDebtType(a.type)&&bal<0?' <span style="font-size:11px;font-weight:500;color:var(--muted)">owed</span>':''}</div>${avLine}
     <div class="field"><label>${synced?'Nickname (bank name: '+esc(a.name)+')':'Name'}</label><input id="m-name" value="${esc(synced?a.nick:a.name)}"></div>
     ${synced?'':`<div class="field"><label>Institution</label><input id="m-inst" value="${esc(a.inst)}"></div>`}
     <div class="field"><label>Type</label><select id="m-type" onchange="acctBalLabel()">${acctTypeOpts(a.type)}</select></div>
