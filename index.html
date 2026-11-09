@@ -186,17 +186,27 @@ tr:hover td{background:var(--hover);}
 .del:hover{color:var(--belt);}
 
 /* FUNDS */
-.fund-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px;}
-.fund{background:var(--panel); border:1px solid var(--rule); border-radius:6px; padding:10px 12px;}
-.fund .name{font-weight:700; font-size:13px; display:flex; justify-content:space-between; align-items:baseline;}
-.fund .nums{font-size:16px; font-weight:700; color:var(--ink); margin:3px 0 6px; font-variant-numeric:tabular-nums;}
+/* Buckets (redesign 2026-11-08, Race's mockup "but shorter"): name + BEHIND/FUNDED pill, "$in of $cap" + type pill,
+   bar, one footer line (next Monday amount · due) with icon buttons Add / Take / Edit. */
+.fund-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:10px;}
+.fund{--ac:var(--rule); --ac-tint:var(--soft); background:var(--panel); border:1px solid var(--ac); border-radius:14px; padding:10px 14px 10px; box-shadow:var(--glow) var(--ac-tint);}
+.fund .name{font-weight:800; font-size:19px; display:flex; justify-content:space-between; align-items:center; gap:8px; line-height:1.15;}
+.fund .name > span:first-child{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.fund .nums{font-size:24px; font-weight:800; color:var(--ink); margin:2px 0 6px; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:10px; flex-wrap:wrap; line-height:1.1;}
 .fund .nums b{color:var(--ink);}
-.fund .bar{height:6px; background:var(--soft); border-radius:3px; overflow:hidden;}
-.fund .fill{height:6px; border-radius:3px; background:var(--money); transition:width .3s;}
-.fund.full{border-color:var(--money);}
-.fund.full .name::after{content:'FUNDED'; font-size:8px; color:var(--money); font-weight:800; letter-spacing:1px;}
+.fund .kind{font-size:12px; font-weight:700; padding:2px 10px; border-radius:999px; border:1px solid currentColor; line-height:1.4;}
+.fund .bar{height:8px; background:var(--soft); border-radius:4px; overflow:hidden; border:1px solid var(--rule);}
+.fund .fill{height:8px; border-radius:4px; background:var(--money); transition:width .3s;}
+.fund.full{--ac:var(--money); --ac-tint:var(--money-tint);}
+.fund.full .name::after{content:'FUNDED'; font-size:12px; color:var(--money); font-weight:800; letter-spacing:.5px; padding:2px 10px; border:1px solid var(--money); border-radius:999px; background:var(--money-tint); flex:none;}
+.fund .foot{display:flex; align-items:center; gap:6px; margin-top:8px;}
+.fund .foot .next{flex:1; min-width:0; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.fund .foot .next b{color:var(--ink); font-size:15px;}
+.ib{width:36px; height:34px; border-radius:9px; border:1px solid var(--rule); background:var(--panel); color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex:none;}
+.ib.green{background:var(--money); border-color:var(--money); color:#fff;}
+.ib.red{color:var(--belt);}
 .fund .acts{display:flex; gap:5px; margin-top:7px;}
-.fund .note{font-size:10px; color:var(--muted); margin-top:5px;}
+.fund .note{font-size:12px; color:var(--muted); margin-top:5px;}
 
 /* ALLOCATION ROWS */
 .alloc{display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--soft);}
@@ -296,10 +306,12 @@ tr:hover td{background:var(--hover);}
 .tile .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
 .tile .big{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums;}
 .tile .in{font-size:13px; color:var(--money); font-weight:700; font-variant-numeric:tabular-nums;}
-.fund .next{font-size:10px; color:var(--muted); margin-top:5px;}
+.fund .next{font-size:13px; color:var(--muted); margin-top:5px;}
 .fund .next b{color:var(--ink);}
-.fund.behind{border-color:var(--belt);}
-.fund.behind .name::after{content:'BEHIND'; font-size:8px; color:var(--belt); font-weight:800; letter-spacing:1px;}
+.fund.behind{--ac:var(--belt); --ac-tint:var(--red-tint);}
+.fund.behind .name::after{content:'BEHIND'; font-size:12px; color:var(--belt); font-weight:800; letter-spacing:.5px; padding:2px 10px; border:1px solid var(--belt); border-radius:999px; background:var(--red-tint); flex:none;}
+.sec-lbl{font-size:18px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink); margin:16px 0 8px; display:flex; align-items:center; gap:8px;}
+.sec-lbl .ic{color:var(--belt); font-size:22px;}
 .tag.st-paid{background:var(--money-tint); color:var(--money);}
 .tag.st-due{background:var(--soft); color:var(--muted);}
 .tag.st-late{background:var(--red-tint); color:var(--belt);}
@@ -311,7 +323,6 @@ tr:hover td{background:var(--hover);}
 .acct.nest{padding-left:16px; border-left:2px solid var(--soft); margin-left:4px;}
 .acct .flow{font-size:11px; color:var(--money); font-weight:600;}
 .tree-note{font-size:11px; color:var(--muted); padding:7px 0 2px; line-height:1.5;}
-.sec-lbl{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:14px 0 6px;}
 .inc{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;}
 .inc .cell{display:flex; align-items:center; gap:10px; background:var(--soft); border:1px solid var(--rule); border-radius:12px; padding:10px 12px; min-width:0;}
 .inc .cell.hot{border-color:var(--money); box-shadow:var(--glow) var(--money-tint);}
@@ -494,12 +505,12 @@ tr:hover td{background:var(--hover);}
 
 <!-- FUNDS -->
 <div class="page" id="p-funds"><div class="wrap">
-  <div class="note-line" style="margin-bottom:10px;">Every purchase has a bucket. If the bucket is empty, the answer is no, not "check the account."</div>
-  <div class="sec-lbl" style="margin-top:0">Expense buckets</div>
+  <div class="note-line" style="margin:0 0 6px; font-size:13px;">Every purchase has a bucket. If the bucket is empty, the answer is no, not "check the account."</div>
+  <div class="sec-lbl" style="margin-top:6px"><span data-ico="layers"></span>Expense buckets</div>
   <div class="fund-grid" id="bucket-grid"></div>
-  <div class="sec-lbl">Funds</div>
+  <div class="sec-lbl"><span data-ico="safe"></span>Funds</div>
   <div class="fund-grid" id="fund-grid"></div>
-  <div style="margin-top:12px;"><button class="small-btn" onclick="addFund()">+ New fund</button></div>
+  <div style="margin-top:12px;"><button class="small-btn" onclick="addFund()"><span data-ico="plus"></span>New fund</button></div>
 </div></div>
 
 <!-- BILLS -->
@@ -630,6 +641,9 @@ const ICO={
   layers:'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5',
   refresh:'M20 11a8 8 0 0 0-14-4L4 9M4 13a8 8 0 0 0 14 4l2-2M4 4v5h5M20 20v-5h-5',
   plus:'M12 5v14M5 12h14',
+  minus:'M5 12h14',
+  edit:'M4 20h4L18 10l-4-4L4 16zM13 7l4 4',
+  x:'M6 6l12 12M18 6L6 18',
   check:'M5 12l5 5L20 7',
   cal:'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4',
   chev:'M6 7l5 5-5 5M13 7l5 5-5 5',
@@ -932,15 +946,18 @@ function bucketCardHTML(grp,b){
   const p=bucketPlan(b), k=KIND[p.kind];
   const pct=p.cap>0?Math.max(0,Math.min(100,p.bucket/p.cap*100)):0, full=p.cap>0&&p.bucket>=p.cap;
   const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  // One footer line: next Monday's amount and the due day. "Need this month" repeats the amount for a
+  // fixed bill, so it is gone (Race, 2026-11-08: "repeated info"); the bar shows how full the bucket is.
+  const next=p.kind==='asneeded'?'Put money in when you decide to.':
+    `${ico('cal')}<span><b>${fmt0(p.weekly)}</b> on ${mon}${b.due?' · due '+esc(b.due):''}</span>`;
   return `<div class="fund ${full?'full':''} ${p.behind?'behind':''}">
     <div class="name"><span>${esc(b.name)}</span></div>
-    <div class="nums"><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt(p.bucket)}</b>${p.cap?' of '+fmt0(p.cap):''} <span style="color:${k[1]};font-size:10px">${k[0]}</span></div>
+    <div class="nums"><span><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt(p.bucket)}</b>${p.cap?' of '+fmt0(p.cap):''}</span><span class="kind" style="color:${k[1]}">${k[0]}</span></div>
     ${p.cap?`<div class="bar"><div class="fill" style="width:${pct}%"></div></div>`:''}
-    <div class="next">${p.kind==='asneeded'?'Put money in when you decide to.':`Next: <b>${fmt0(p.weekly)}</b> on ${mon}${p.need?' · need '+fmt0(p.need)+' this month':' · topped up'}${b.due?' · due '+esc(b.due):''}`}</div>
-    <div class="acts">
-      <button class="small-btn green" onclick="bucketMove('${grp}',${b.id},1)">Add</button>
-      <button class="small-btn" onclick="bucketMove('${grp}',${b.id},-1)">Take</button>
-      <button class="small-btn" style="margin-left:auto" onclick="billOpen('${grp}',${b.id})">Edit</button>
+    <div class="foot"><div class="next">${next}</div>
+      <button class="ib green" title="Add" onclick="bucketMove('${grp}',${b.id},1)">${ico('plus')}</button>
+      <button class="ib" title="Take" onclick="bucketMove('${grp}',${b.id},-1)">${ico('minus')}</button>
+      <button class="ib" title="Edit" onclick="billOpen('${grp}',${b.id})">${ico('edit')}</button>
     </div>
   </div>`;
 }
@@ -962,13 +979,12 @@ function budgetBucketCardHTML(){
   const mon=nextMonday(new Date()).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   return `<div class="fund ${amt>0&&inB>=amt?'full':''}">
     <div class="name"><span>Spending budget</span></div>
-    <div class="nums"><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt(inB)}</b> of ${fmt0(amt)} <span style="color:var(--amber);font-size:10px">Average</span></div>
+    <div class="nums"><span><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt(inB)}</b> of ${fmt0(amt)}</span><span class="kind" style="color:var(--amber)">Average</span></div>
     <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-    <div class="next">Next: <b>${fmt0(amt*12/52)}</b> on ${mon}${inB<amt?' · need '+fmt0(amt-inB)+' this month':' · topped up'}</div>
-    <div class="acts">
-      <button class="small-btn green" onclick="budgetBucketMove(1)">Add</button>
-      <button class="small-btn" onclick="budgetBucketMove(-1)">Take</button>
-      <button class="small-btn" style="margin-left:auto" onclick="showTab('budget')">Budget</button>
+    <div class="foot"><div class="next">${ico('cal')}<span><b>${fmt0(amt*12/52)}</b> on ${mon}</span></div>
+      <button class="ib green" title="Add" onclick="budgetBucketMove(1)">${ico('plus')}</button>
+      <button class="ib" title="Take" onclick="budgetBucketMove(-1)">${ico('minus')}</button>
+      <button class="ib" title="Budget" onclick="showTab('budget')">${ico('pie')}</button>
     </div>
   </div>`;
 }
@@ -991,15 +1007,14 @@ function renderFunds(){
     const pct=f.tgt>0?Math.min(100,f.cur/f.tgt*100):0;
     const full=f.tgt>0&&f.cur>=f.tgt;
     return `<div class="fund ${full?'full':''}">
-      <div class="name">${f.name}</div>
-      <div class="nums"><b>${fmt(f.cur)}</b>${f.tgt>0?' of '+fmt0(f.tgt):''}</div>
+      <div class="name"><span>${esc(f.name)}</span></div>
+      <div class="nums"><span><b>${fmt(f.cur)}</b>${f.tgt>0?' of '+fmt0(f.tgt):''}</span></div>
       <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-      <div class="acts">
-        <button class="small-btn green" onclick="fundMove(${f.id},1)">Add</button>
-        <button class="small-btn" onclick="fundMove(${f.id},-1)">Take</button>
-        <button class="del" style="margin-left:auto" onclick="delFund(${f.id})">×</button>
+      <div class="foot"><div class="next">${f.note?esc(f.note):(f.tgt>0?fmt0(Math.max(0,f.tgt-f.cur))+' to go':'Open-ended')}</div>
+        <button class="ib green" title="Add" onclick="fundMove(${f.id},1)">${ico('plus')}</button>
+        <button class="ib" title="Take" onclick="fundMove(${f.id},-1)">${ico('minus')}</button>
+        <button class="ib red" title="Delete" onclick="delFund(${f.id})">${ico('x')}</button>
       </div>
-      ${f.note?'<div class="note">'+f.note+'</div>':''}
     </div>`;
   }).join('');
   const funded=S.funds.filter(f=>f.tgt>0&&f.cur>=f.tgt).length;
