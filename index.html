@@ -15,41 +15,40 @@
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+/* REDESIGN (Race, 2026-11-08, from his mockup): black base, red brand, glowing category cards with icons
+   (green = incoming, gold = cash, red = outgoing/debt), big digits, bottom bar on phones. Dark is the
+   default; light is the same structure on a pale base. themeInit() sets data-theme before first paint. */
 :root{
-  --paper:#fafaf8; --panel:#ffffff; --ink:#16181a; --muted:#8a8a85;
-  --rule:#e3e1dc; --belt:#b8342b; --money:#1f7a4d; --amber:#a86b1f;
-  --soft:#f1efe9;
-  --field:#ffffff; --hover:#fcfbf8; --on-ink:#ffffff; --ink2:#555555; --faint:#bbbbbb;
-  --belt-tint:#fdf2f1; --money-tint:#e7f3ec; --amber-tint:#faf3e0; --red-tint:#fdecea;
+  --paper:#f3f3f5; --panel:#ffffff; --ink:#15161a; --muted:#7c7f88;
+  --rule:#dcdde3; --belt:#d6251c; --money:#1f9d55; --amber:#c98a12;
+  --soft:#eceef2;
+  --field:#ffffff; --hover:#f7f7fa; --on-ink:#ffffff; --ink2:#4a4d57; --faint:#b9bcc6;
+  --belt-tint:#fbe9e7; --money-tint:#e4f5ea; --amber-tint:#fbf1dc; --red-tint:#fbe9e7;
   --blue:#1d4f9e; --blue-tint:#e8effa; --purple:#6d28d9; --purple-tint:#f1e8fa;
-  --gold:#b8342b; --gold-tint:#fdf2f1; --box:#16181a;
+  --gold:#c98a12; --gold-tint:#fbf1dc; --box:#15161a; --icon-bg:#eceef2;
+  --glow:0 0 0 rgba(0,0,0,0);
 }
-/* DARK MODE: warm near-black with gold tones (Race, 2026-11-07). Green = cash, red = debt stay as is.
-   themeInit() sets data-theme on <html> before first paint: saved choice, else the OS preference. */
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --paper:#141210; --panel:#1c1915; --ink:#ece4d2; --muted:#9a8f7a;
-  --rule:#332d24; --belt:#e0574d; --money:#5bb87f; --amber:#d4a94a;
-  --soft:#262119;
-  --field:#1c1915; --hover:#221e18; --on-ink:#141210; --ink2:#cbbfa6; --faint:#4e4639;
-  --belt-tint:#3a211c; --money-tint:#1d3326; --amber-tint:#3a2e18; --red-tint:#3a211c;
+  --paper:#0a0a0c; --panel:#131316; --ink:#f4f4f6; --muted:#9a9ca6;
+  --rule:#26272d; --belt:#e8302a; --money:#2fd36b; --amber:#f0b429;
+  --soft:#1b1b20;
+  --field:#131316; --hover:#19191e; --on-ink:#0a0a0c; --ink2:#d2d3da; --faint:#4a4b55;
+  --belt-tint:#2a1213; --money-tint:#0f2a1a; --amber-tint:#2b2110; --red-tint:#2a1213;
   --blue:#8fb0e8; --blue-tint:#1f2a3d; --purple:#b391e6; --purple-tint:#2c2140;
-  --gold:#d4a94a; --gold-tint:#2e2612; --box:#2a241b;
+  --gold:#f0b429; --gold-tint:#2b2110; --box:#1b1b20; --icon-bg:#1f1f25;
+  --glow:0 0 18px;
 }
-:root[data-theme="dark"] .brand span{color:var(--gold);}
-:root[data-theme="dark"] .card-h{color:var(--gold);}
-:root[data-theme="dark"] .tab.active{color:var(--gold); background:var(--gold-tint);}
-:root[data-theme="dark"] .small-btn.primary,:root[data-theme="dark"] .modal .row .go,:root[data-theme="dark"] .auth-card .go{background:var(--gold); border-color:var(--gold);}
-:root[data-theme="dark"] .seg span.on{background:var(--gold);}
-:root[data-theme="dark"] input:focus,:root[data-theme="dark"] select:focus,:root[data-theme="dark"] textarea:focus{border-color:var(--gold);}
-:root[data-theme="dark"] #toast{border-left-color:var(--gold);}
-:root[data-theme="dark"] header{border-bottom-color:var(--gold);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{
   font-family:'Archivo',-apple-system,'Segoe UI',Arial,sans-serif;
-  background:var(--paper); color:var(--ink); font-size:13px;
+  background:var(--paper); color:var(--ink); font-size:14px;
   height:100vh; display:flex; flex-direction:column; overflow:hidden;
 }
+:root[data-theme="dark"] body{background:radial-gradient(120% 60% at 100% 0%, var(--belt-tint) 0%, var(--paper) 45%) fixed;}
+svg.ic{width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex:none;}
+.icb{width:34px; height:34px; border-radius:9px; background:var(--icon-bg); color:var(--ink2); display:inline-flex; align-items:center; justify-content:center; font-size:18px; flex:none; border:1px solid var(--rule);}
+.icb.ac{background:var(--ac-tint); color:var(--ac); border-color:var(--ac);}
 button{font-family:inherit;}
 input,select,textarea{
   font-family:inherit; font-size:13px; color:var(--ink);
@@ -60,47 +59,60 @@ input:focus,select:focus,textarea:focus{border-color:var(--ink);}
 
 /* HEADER */
 header{
-  background:var(--panel); border-bottom:2px solid var(--ink);
-  padding:8px 16px; display:flex; align-items:center; gap:16px; flex-shrink:0;
+  background:transparent; border-bottom:1px solid var(--rule);
+  padding:10px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0;
 }
-.brand{font-weight:800; font-size:14px; letter-spacing:2px; text-transform:uppercase; display:flex; align-items:center; gap:8px;}
+.brand{font-weight:800; font-size:17px; line-height:1; letter-spacing:.5px; text-transform:uppercase; display:flex; align-items:center; gap:10px; font-style:italic;}
+.brand div{display:flex; flex-direction:column; gap:2px; white-space:nowrap;}
 .brand span{color:var(--belt);}
-.brand img{width:30px; height:30px; flex-shrink:0;}
-.auth-card .brand img{width:72px; height:72px; display:block; margin:0 auto;}
-.head-stats{display:flex; gap:18px; margin-left:auto; align-items:baseline; flex-wrap:wrap;}
-.hs{display:flex; flex-direction:column;}
-.hs .l{font-size:9px; text-transform:uppercase; letter-spacing:1px; color:var(--muted);}
-.hs .v{font-weight:800; font-size:17px; font-variant-numeric:tabular-nums;}
-.hs .v.red{color:var(--belt);}
-.hs .v.green{color:var(--money);}
-.tools{display:flex; gap:6px;}
+.brand img{width:44px; height:44px; flex-shrink:0;}
+.auth-card .brand img{width:88px; height:88px; display:block; margin:0 auto;}
+.head-stats{display:none;}
+.tools{display:flex; gap:6px; margin-left:auto; align-items:center;}
 .tool-btn{
-  font-size:10px; padding:4px 9px; background:none;
-  border:1px solid var(--rule); border-radius:4px; color:var(--muted); cursor:pointer;
+  font-size:11px; font-weight:600; padding:6px 10px; background:var(--panel);
+  border:1px solid var(--rule); border-radius:8px; color:var(--muted); cursor:pointer;
 }
 .tool-btn:hover{color:var(--ink); border-color:var(--ink);}
+#sync-dot{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; padding:6px 12px; border-radius:999px; border:1px solid var(--money); color:var(--money); background:var(--money-tint); box-shadow:var(--glow) var(--money-tint);}
+#sync-dot.off{border-color:var(--amber); color:var(--amber); background:var(--amber-tint); box-shadow:none;}
 
-/* NAV: left sidebar on wide screens; on phones a drawer behind the hamburger (CRM style, Race 2026-11-06).
-   #app is a grid: header across the top, nav in the left column, the active page in the right column. */
-#app.authed{display:grid; grid-template-columns:170px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);}
+/* NAV: left sidebar on wide screens; on phones a drawer behind the hamburger (CRM style, Race 2026-11-06)
+   plus a bottom bar with the five main tabs (redesign 2026-11-08). #app is a grid: header across the top,
+   nav in the left column, the active page in the right column. */
+#app.authed{display:grid; grid-template-columns:190px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr);}
 header{grid-column:1 / -1;}
 .tabs{grid-row:2; grid-column:1; display:flex; flex-direction:column; background:var(--panel); border-right:1px solid var(--rule); padding:10px 8px; overflow-y:auto;}
 /* Buttons share the sidebar's full height (Race, 2026-11-08: "squished to the top"). */
 .tab{
-  flex:1 1 0; min-height:40px; display:flex; align-items:center; padding:0 14px; font-size:13px; font-weight:600; color:var(--muted); border-radius:5px;
-  cursor:pointer; white-space:nowrap; margin-bottom:4px;
+  flex:1 1 0; min-height:42px; max-height:64px; display:flex; align-items:center; gap:10px; padding:0 14px; font-size:14px; font-weight:700; color:var(--muted); border-radius:10px;
+  cursor:pointer; white-space:nowrap; margin-bottom:4px; border:1px solid transparent;
 }
+.tab .ic{font-size:18px;}
 .tab:hover{color:var(--ink); background:var(--soft);}
-.tab.active{color:var(--belt); background:var(--belt-tint);}
-.burger{display:none; font-size:20px; line-height:1; padding:2px 8px; background:none; border:1px solid var(--rule); border-radius:4px; color:var(--ink); cursor:pointer;}
-#nav-scrim{display:none; position:fixed; inset:0; background:rgba(20,20,20,.45); z-index:85;}
+.tab.active{color:var(--on-ink); background:var(--belt); border-color:var(--belt); box-shadow:var(--glow) var(--belt-tint);}
+:root[data-theme="dark"] .tab.active{color:#fff;}
+.nav-foot{margin-top:auto; padding-top:10px; border-top:1px solid var(--rule); display:none; flex-wrap:wrap; gap:6px;}
+.nav-foot .tool-btn{flex:1 1 40%;}
+.burger{display:none; font-size:22px; line-height:1; width:44px; height:44px; background:var(--panel); border:1px solid var(--rule); border-radius:10px; color:var(--ink); cursor:pointer; align-items:center; justify-content:center;}
+#nav-scrim{display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:85;}
+.bbar{display:none; position:fixed; left:0; right:0; bottom:0; z-index:80; background:var(--panel); border-top:1px solid var(--rule); padding:6px 4px calc(6px + env(safe-area-inset-bottom)); justify-content:space-around;}
+.bb{display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; font-weight:600; color:var(--muted); padding:4px 8px; border-radius:8px; cursor:pointer; min-width:56px;}
+.bb .ic{font-size:22px;}
+.bb.active{color:var(--belt);}
 @media(max-width:760px){
   #app.authed{grid-template-columns:minmax(0,1fr);}
-  .burger{display:inline-block;}
+  header{padding:8px 12px;}
+  .brand{font-size:15px;}
+  .tools .tool-btn{display:none;}
+  .nav-foot{display:flex;}
+  .burger{display:inline-flex;}
   .tabs{position:fixed; top:0; bottom:0; left:0; width:66vw; max-width:300px; z-index:90; border-right:1px solid var(--rule);
-    box-shadow:2px 0 12px rgba(0,0,0,.12); transform:translateX(-102%); transition:transform .2s ease; padding-top:16px;}
+    box-shadow:2px 0 12px rgba(0,0,0,.4); transform:translateX(-102%); transition:transform .2s ease; padding-top:16px;}
   .tabs.open{transform:translateX(0);}
   #nav-scrim.open{display:block;}
+  .bbar{display:flex;}
+  .page{padding:12px 12px 84px;}
   .page.active{grid-column:1;}
 }
 
@@ -109,19 +121,27 @@ header{grid-column:1 / -1;}
 .page.active{display:block; grid-row:2; grid-column:2; min-height:0;}
 .wrap{max-width:1000px; margin:0 auto;}
 
-.card{background:var(--panel); border:1px solid var(--rule); border-radius:6px; margin-bottom:12px; overflow:hidden;}
+/* Cards: an accent (--ac) colors the header icon, the border and the glow. Set by .ac-green/.ac-gold/.ac-red. */
+.card{--ac:var(--rule); --ac-tint:var(--soft); background:var(--panel); border:1px solid var(--ac); border-radius:14px; margin-bottom:14px; overflow:hidden; box-shadow:var(--glow) var(--ac-tint);}
+.card.ac-green{--ac:var(--money); --ac-tint:var(--money-tint);}
+.card.ac-gold{--ac:var(--gold); --ac-tint:var(--gold-tint);}
+.card.ac-red{--ac:var(--belt); --ac-tint:var(--red-tint);}
+.card.ac-grey{--ac:var(--rule); --ac-tint:var(--soft);}
 .card-h{
-  padding:7px 12px; border-bottom:1px solid var(--rule); background:var(--soft);
-  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--ink2);
-  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 14px; border-bottom:1px solid var(--rule); background:transparent;
+  font-size:17px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--ink);
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
 }
-.card-b{padding:10px 12px;}
+.card-h .ttl{display:flex; align-items:center; gap:10px; min-width:0;}
+.card-b{padding:10px 14px;}
 .small-btn{
-  font-size:10px; font-weight:600; padding:3px 10px; border-radius:4px;
-  border:1px solid var(--rule); background:var(--field); color:var(--ink); cursor:pointer;
+  font-size:12px; font-weight:700; padding:7px 12px; border-radius:9px;
+  border:1px solid var(--rule); background:var(--panel); color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; gap:6px;
 }
+.small-btn .ic{font-size:15px;}
 .small-btn:hover{border-color:var(--ink);}
 .small-btn.primary{background:var(--ink); color:var(--on-ink); border-color:var(--ink);}
+:root[data-theme="dark"] .small-btn.primary{background:var(--panel); color:var(--ink); border-color:var(--ink2);}
 .small-btn.green{background:var(--money); color:#fff; border-color:var(--money);}
 
 /* CHECKLIST */
@@ -226,21 +246,33 @@ tr:hover td{background:var(--hover);}
 #toast.show{opacity:1;}
 
 /* ACCOUNTS OVERVIEW (home) */
-.home-top{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
-.home-q{font-size:15px; font-weight:800; letter-spacing:.3px;}
-.home-sub{font-size:11px; color:var(--muted); margin-top:2px;}
-.seg{display:inline-flex; border:1px solid var(--rule); border-radius:6px; overflow:hidden; font-size:11px;}
-.seg span{padding:5px 9px; cursor:pointer; color:var(--muted); background:var(--field);}
-.seg span.on{background:var(--ink); color:var(--on-ink);}
-.acct{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
+.home-top{display:flex; flex-direction:column; gap:10px; margin-bottom:12px;}
+.home-q{font-size:28px; font-weight:800; letter-spacing:.2px; line-height:1.1;}
+.home-sub{font-size:13px; color:var(--muted); margin-top:3px;}
+.home-acts{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.seg{display:inline-flex; gap:8px; font-size:12px;}
+.seg span{padding:7px 12px; cursor:pointer; color:var(--ink); background:var(--panel); border:1px solid var(--rule); border-radius:9px; font-weight:700; display:inline-flex; align-items:center; gap:6px;}
+.seg span .ic{font-size:15px;}
+.seg span.on{background:var(--belt); color:#fff; border-color:var(--belt); box-shadow:var(--glow) var(--belt-tint);}
+.sum{display:flex; align-items:center; gap:14px; padding:14px 16px;}
+.sum .icb{width:48px; height:48px; font-size:26px; border-radius:12px;}
+.sum .l{font-size:14px; font-weight:600; color:var(--ink2);}
+.sum .big{font-size:34px; font-weight:800; line-height:1.05; font-variant-numeric:tabular-nums;}
+.sum .side{margin-left:auto; display:flex; gap:14px;}
+.sum .side div{text-align:left; border-left:1px solid var(--rule); padding-left:14px;}
+.sum .side .l{font-size:12px;}
+.sum .side .v{font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:3px;}
+.sum .side .v.g{color:var(--money);}
+.sum .side .v.r{color:var(--belt);}
+.acct{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .acct:last-child{border-bottom:none;}
 .acct:hover{background:var(--hover);}
-.acct .nm{font-weight:700;}
-.acct .sub{font-size:11px; color:var(--muted); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
-.acct .bal{margin-left:auto; text-align:right; font-weight:800; font-size:21px; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.acct .nm{font-weight:700; font-size:15px;}
+.acct .sub{font-size:12px; color:var(--muted); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+.acct .bal{margin-left:auto; text-align:right; font-weight:800; font-size:24px; font-variant-numeric:tabular-nums; white-space:nowrap;}
 .acct .bal.neg{color:var(--belt);}
 .acct .bal .asof{display:block; font-size:11px; font-weight:500; color:var(--muted);}
-.grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:15px; font-weight:800; color:var(--ink);}
+.grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:24px; font-weight:800; color:var(--ink); white-space:nowrap;}
 .grp-tot.neg{color:var(--belt);}
 .exp{display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
 .exp:last-child{border-bottom:none;}
@@ -271,21 +303,24 @@ tr:hover td{background:var(--hover);}
 .tag.st-paid{background:var(--money-tint); color:var(--money);}
 .tag.st-due{background:var(--soft); color:var(--muted);}
 .tag.st-late{background:var(--red-tint); color:var(--belt);}
-.tag.ok{background:var(--money-tint); color:var(--money);}
-.tag.man{background:var(--soft); color:var(--muted);}
-.tag.attn{background:var(--amber-tint); color:var(--amber);}
+.tag.ok{background:var(--money-tint); color:var(--money); border:1px solid var(--money); border-radius:6px;}
+.tag.man{background:var(--soft); color:var(--muted); border:1px solid var(--rule); border-radius:6px;}
+.tag.attn{background:var(--amber-tint); color:var(--amber); border:1px solid var(--amber); border-radius:6px;}
 .attn-box{border-color:var(--amber);}
 .attn-box .card-b{color:var(--amber); font-size:12px;}
 .acct.nest{padding-left:16px; border-left:2px solid var(--soft); margin-left:4px;}
 .acct .flow{font-size:11px; color:var(--money); font-weight:600;}
 .tree-note{font-size:11px; color:var(--muted); padding:7px 0 2px; line-height:1.5;}
 .sec-lbl{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:14px 0 6px;}
-.inc{display:flex; gap:10px; flex-wrap:wrap;}
-.inc .cell{flex:1; min-width:120px;}
-.inc .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
-.inc .amt{font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money);}
+.inc{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;}
+.inc .cell{display:flex; align-items:center; gap:10px; background:var(--soft); border:1px solid var(--rule); border-radius:12px; padding:10px 12px; min-width:0;}
+.inc .cell.hot{border-color:var(--money); box-shadow:var(--glow) var(--money-tint);}
+.inc .cell .icb{width:40px; height:40px; font-size:20px;}
+.inc .cell > div{min-width:0;}
+.inc .lbl{font-size:13px; font-weight:600; color:var(--ink2);}
+.inc .amt{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--money); line-height:1.1;}
 .inc .amt.zero{color:var(--faint);}
-.inc .when{font-size:11px; color:var(--muted);}
+.inc .when{font-size:12px; color:var(--muted);}
 .inc-big{padding:12px 0 6px;}
 .inc-big .n{font-size:36px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; color:var(--money);}
 .inc-big .n .zero{color:var(--faint);}
@@ -295,7 +330,8 @@ tr:hover td{background:var(--hover);}
 .inc-proj b{color:var(--ink); font-size:16px; font-variant-numeric:tabular-nums;}
 .inc{padding:8px 0 10px;}
 .inc .amt .zero{color:var(--faint);}
-.down{font-size:11px; color:var(--muted); padding:6px 0; border-top:1px solid var(--soft); border-bottom:1px solid var(--soft);}
+.down{font-size:13px; color:var(--muted); padding:8px 0; border-bottom:1px solid var(--soft); display:flex; align-items:center; gap:8px;}
+.down .ic{font-size:16px;}
 
 /* AUTH GATE */
 #app{display:none; flex:1; min-height:0; overflow:hidden;}
@@ -310,9 +346,17 @@ tr:hover td{background:var(--hover);}
 #auth-err{color:var(--belt); font-size:11px; margin-top:8px; min-height:14px;}
 #sync-dot{font-size:10px; font-weight:600; align-self:center;}
 @media(max-width:640px){
-  .head-stats{display:none;}
   .bud-name{width:105px;}
   .bud-nums{width:110px;}
+  .sum{flex-wrap:wrap;}
+  .sum .big{font-size:30px;}
+  .inc .cell .icb{display:none;}
+  .inc .amt{font-size:23px;}
+  .exp .m{width:118px;}
+  .exp .st{width:62px;}
+  .acct .bal{font-size:22px;}
+  .grp-tot{font-size:22px;}
+  .card-h{font-size:16px;}
 }
 </style>
 </head>
@@ -332,13 +376,10 @@ tr:hover td{background:var(--hover);}
 <div id="app">
 
 <header>
-  <button class="burger" onclick="navToggle()" aria-label="Menu">&#9776;</button>
-  <div class="brand"><img id="hdr-logo" src="logo-72.png" alt="" onerror="this.style.visibility='hidden'"><div>BARES <span>FINANCIAL OS</span></div></div>
+  <button class="burger" onclick="navToggle()" aria-label="Menu"><span data-ico="menu"></span></button>
+  <div class="brand"><img id="hdr-logo" src="logo-72.png" alt="" onerror="this.style.visibility='hidden'"><div><span style="color:var(--ink)">BARES</span><span style="color:var(--ink)">FINANCIAL <span>OS</span></span></div></div>
   <div class="head-stats">
-    <div class="hs"><span class="l">Card debt</span><span class="v red" id="h-debt">—</span></div>
-    <div class="hs"><span class="l">Interest/mo</span><span class="v red" id="h-int">—</span></div>
-    <div class="hs"><span class="l">Avalanche target</span><span class="v" id="h-target">—</span></div>
-    <div class="hs"><span class="l">Funds funded</span><span class="v green" id="h-funds">—</span></div>
+    <span id="h-debt"></span><span id="h-int"></span><span id="h-target"></span><span id="h-funds"></span>
   </div>
   <div class="tools">
     <span id="sync-dot"></span>
@@ -351,25 +392,39 @@ tr:hover td{background:var(--hover);}
 
 <div id="nav-scrim" onclick="navToggle(false)"></div>
 <div class="tabs" id="nav">
-  <div class="tab active" data-t="home" onclick="showTab('home')">Accounts</div>
-  <div class="tab" data-t="income" onclick="showTab('income')">Income</div>
-  <div class="tab" data-t="bills" onclick="showTab('bills')">Expenses</div>
-  <div class="tab" data-t="budget" onclick="showTab('budget')">Budget</div>
-  <div class="tab" data-t="funds" onclick="showTab('funds')">Buckets</div>
-  <div class="tab" data-t="txns" onclick="showTab('txns')">Transactions</div>
-  <div class="tab" data-t="debt" onclick="showTab('debt')">Debt</div>
-  <div class="tab" data-t="month" onclick="showTab('month')">Month-End</div>
-  <div class="tab" data-t="banks" onclick="showTab('banks')">Banks</div>
+  <div class="tab active" data-t="home" onclick="showTab('home')"><span data-ico="home"></span>Accounts</div>
+  <div class="tab" data-t="income" onclick="showTab('income')"><span data-ico="down"></span>Income</div>
+  <div class="tab" data-t="bills" onclick="showTab('bills')"><span data-ico="receipt"></span>Expenses</div>
+  <div class="tab" data-t="budget" onclick="showTab('budget')"><span data-ico="pie"></span>Budget</div>
+  <div class="tab" data-t="funds" onclick="showTab('funds')"><span data-ico="bucket"></span>Buckets</div>
+  <div class="tab" data-t="txns" onclick="showTab('txns')"><span data-ico="swap"></span>Transactions</div>
+  <div class="tab" data-t="debt" onclick="showTab('debt')"><span data-ico="card"></span>Debt</div>
+  <div class="tab" data-t="month" onclick="showTab('month')"><span data-ico="bars"></span>Month-End</div>
+  <div class="tab" data-t="banks" onclick="showTab('banks')"><span data-ico="bank"></span>Banks</div>
+  <div class="nav-foot">
+    <button class="tool-btn" onclick="themeToggle()">Theme</button>
+    <button class="tool-btn" onclick="exportData()">Export</button>
+    <button class="tool-btn" onclick="openImport()">Import</button>
+    <button class="tool-btn" onclick="signOut()">Sign out</button>
+  </div>
+</div>
+<!-- Phone bottom bar: the five main tabs. The drawer still has all of them. -->
+<div class="bbar" id="bbar">
+  <div class="bb active" data-t="home" onclick="showTab('home')"><span data-ico="home"></span>Overview</div>
+  <div class="bb" data-t="txns" onclick="showTab('txns')"><span data-ico="swap"></span>Transactions</div>
+  <div class="bb" data-t="funds" onclick="showTab('funds')"><span data-ico="bucket"></span>Buckets</div>
+  <div class="bb" data-t="bills" onclick="showTab('bills')"><span data-ico="receipt"></span>Expenses</div>
+  <div class="bb" data-t="income" onclick="showTab('income')"><span data-ico="down"></span>Income</div>
 </div>
 
 <!-- ACCOUNTS OVERVIEW (home) -->
 <div class="page active" id="p-home"><div class="wrap">
   <div class="home-top">
     <div><div class="home-q">Accounts overview</div><div class="home-sub" id="home-sub"></div></div>
-    <div style="display:flex; gap:6px; align-items:center;">
-      <div class="seg" id="home-view"><span data-v="flow" onclick="homeView('flow')">By category</span><span data-v="bank" onclick="homeView('bank')">By bank</span></div>
-      <button class="small-btn" id="home-sync-btn" onclick="syncAll(true)">Sync</button>
-      <button class="small-btn primary" onclick="addAccount()">+ Add Account</button>
+    <div class="home-acts">
+      <div class="seg" id="home-view"><span data-v="flow" onclick="homeView('flow')"><span data-ico="layers"></span>By category</span><span data-v="bank" onclick="homeView('bank')"><span data-ico="bank"></span>By bank</span></div>
+      <button class="small-btn" id="home-sync-btn" onclick="syncAll(true)"><span data-ico="refresh"></span>Sync</button>
+      <button class="small-btn" onclick="addAccount()"><span data-ico="plus"></span>Add Account</button>
     </div>
   </div>
   <div id="home-groups"></div>
@@ -379,8 +434,8 @@ tr:hover td{background:var(--hover);}
 <div class="page" id="p-income"><div class="wrap">
   <div class="home-top">
     <div><div class="home-q">Income</div><div class="home-sub" id="income-sub"></div></div>
-    <div style="display:flex; gap:6px; align-items:center;">
-      <button class="small-btn" onclick="syncAll(true)">Sync</button>
+    <div class="home-acts">
+      <button class="small-btn" onclick="syncAll(true)"><span data-ico="refresh"></span>Sync</button>
     </div>
   </div>
   <div id="income-card"></div>
@@ -543,14 +598,56 @@ tr:hover td{background:var(--hover);}
 // Per-device choice in localStorage (not part of S); falls back to the OS preference.
 function themeApply(t){
   document.documentElement.dataset.theme=t;
-  const m=document.querySelector('meta[name="theme-color"]'); if(m)m.content=t==='dark'?'#141210':'#16181a';
+  const m=document.querySelector('meta[name="theme-color"]'); if(m)m.content=t==='dark'?'#0a0a0c':'#f3f3f5';
   const b=document.getElementById('theme-btn'); if(b)b.textContent=t==='dark'?'Light':'Dark';
 }
 function themeInit(){
   let t='';
   try{t=localStorage.getItem('bares_theme')||'';}catch(e){}
-  if(t!=='dark'&&t!=='light')t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  if(t!=='dark'&&t!=='light')t='dark'; // redesign 2026-11-08: dark is the default look
   themeApply(t);
+}
+// Inline icon set (stroke paths, 24-box). ico(name) returns an <svg class="ic">; fillIcons() expands
+// static <span data-ico="..."> markers once at load. No external icon files.
+const ICO={
+  menu:'M4 7h16M4 12h16M4 17h16',
+  home:'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  down:'M12 4v16m-6-6l6 6 6-6',
+  upright:'M7 17L17 7M9 7h8v8',
+  receipt:'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
+  pie:'M12 3v9h9a9 9 0 1 1-9-9zM14 2a8 8 0 0 1 8 8h-8z',
+  bucket:'M4 6h16l-2 14H6zM4 6c0-1.5 3.6-3 8-3s8 1.5 8 3',
+  swap:'M4 8h14m-4-4l4 4-4 4M20 16H6m4-4l-4 4 4 4',
+  card:'M3 6h18v12H3zM3 10h18M7 15h4',
+  bars:'M5 20V10M12 20V4M19 20v-7',
+  bank:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18',
+  piggy:'M5 12a7 6 0 0 1 13-2h2v4h-2a7 6 0 0 1-3 4v2h-3v-2H9v2H6v-3a6 6 0 0 1-1-5zM15 10h.01',
+  safe:'M4 4h16v16H4zM12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 8v2M12 14v2M8 12h2M14 12h2',
+  percent:'M19 5L5 19M7 5m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+  coins:'M12 7m-7 0a7 3 0 1 0 14 0a7 3 0 1 0-14 0M5 7v10c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3',
+  car:'M5 16l1-5h12l1 5M3 16h18v4h-2M3 20h2M7 20m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M17 20m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M7 11l1.5-4h7L17 11',
+  doc:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6',
+  layers:'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5',
+  refresh:'M20 11a8 8 0 0 0-14-4L4 9M4 13a8 8 0 0 0 14 4l2-2M4 4v5h5M20 20v-5h-5',
+  plus:'M12 5v14M5 12h14',
+  check:'M5 12l5 5L20 7',
+  cal:'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4',
+  chev:'M6 7l5 5-5 5M13 7l5 5-5 5',
+  target:'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 12m-5 0a5 5 0 1 0 10 0a5 5 0 1 0-10 0M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
+  box:'M4 7h16v13H4zM4 7l2-4h12l2 4M10 11h4'
+};
+function ico(n){ return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICO[n]||ICO.box}"/></svg>`; }
+function fillIcons(){ document.querySelectorAll('[data-ico]').forEach(el=>{ el.innerHTML=ico(el.dataset.ico); el.removeAttribute('data-ico'); }); }
+function acctIco(a){
+  const n=(a.nick||a.name||'').toLowerCase();
+  if(/tax/.test(n))return 'percent';
+  if(/broker|invest/.test(n))return 'bars';
+  if(/save your way|emergency|vault/.test(n))return 'safe';
+  if(a.type==='credit')return 'card';
+  if(a.type==='loan')return /escalade|cadillac|car|auto|truck/.test(n)?'car':'doc';
+  if(a.type==='savings')return 'piggy';
+  if(a.type==='cash')return 'coins';
+  return 'bank';
 }
 function themeToggle(){
   const t=document.documentElement.dataset.theme==='dark'?'light':'dark';
@@ -686,8 +783,8 @@ document.addEventListener('visibilitychange',refreshIfStale);
 window.addEventListener('focus',refreshIfStale);
 function syncDot(ok){
   const el=$('sync-dot'); if(!el)return;
-  el.textContent=ok?'Synced':'Offline';
-  el.style.color=ok?'var(--money)':'var(--amber)';
+  el.innerHTML=ico(ok?'check':'refresh')+(ok?'Synced':'Offline');
+  el.classList.toggle('off',!ok);
 }
 function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);}
 
@@ -717,7 +814,7 @@ document.addEventListener('touchend',e=>{
 },{passive:true});
 function showTab(t){
   navToggle(false);
-  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.t===t));
+  document.querySelectorAll('.tab,.bb').forEach(el=>el.classList.toggle('active',el.dataset.t===t));
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   $('p-'+t).classList.add('active');
   // Stripe is checked with every bank sync (auto on open when the last sync is >6h old, or the Sync button).
@@ -1531,6 +1628,7 @@ function acctRowHTML(a,i,extra){
   const sub2=[debt&&bal<0?'owed':'',avail].filter(Boolean).join(' · ');
   const x=extra||{};
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
+    <span class="icb">${ico(acctIco(a))}</span>
     <div><div class="nm">${esc(a.nick||a.name)}</div>
       <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
     <div class="bal ${bal<0?'neg':''}">${fmt(debt?Math.abs(bal):bal)}${sub2?'<span class="asof">'+sub2+'</span>':''}</div>
@@ -1540,18 +1638,19 @@ function acctRowHTML(a,i,extra){
 // Roles live on the accounts themselves (role: hub|dispatch, feed: $/wk from the hub, payer: account id
 // that pays a card). Accounts with no role fall into Savings & other / Payoff, so a fresh registry still renders.
 function acctLabel(a){ return a?(a.nick||a.name):''; }
+// opts: debt (owed wording), ac (green|gold|red|grey accent), ico (header icon), before/after html.
 function treeCard(title,rows,opts){
   const o=opts||{}, tot=rows.reduce((s,x)=>s+(+x.a.balance||0),0);
   const totTxt=o.debt?fmt(Math.abs(tot))+(tot<0?' owed':''):(tot<0?'-':'')+fmt(Math.abs(tot));
-  return `<div class="card"><div class="card-h"><span>${title}</span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
-    <div class="card-b" style="padding:0 12px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
+  return `<div class="card ac-${o.ac||'grey'}"><div class="card-h"><span class="ttl"><span class="icb ac">${ico(o.ico||'bank')}</span><span>${title}</span></span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
+    <div class="card-b" style="padding:0 14px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
 }
 // Income card: income only, no account balances (Race, 2026-11-08: "separate income and accounts").
 // The hub account is tagged "income lands here" on the Accounts tab instead.
 function renderIncoming(){
   const s=stripeRec();
   if(!s.key){
-    return `<div class="card"><div class="card-h"><span>Income</span></div><div class="card-b" style="padding:0 12px">
+    return `<div class="card ac-green"><div class="card-h"><span class="ttl"><span class="icb ac">${ico('down')}</span><span>Income</span></span></div><div class="card-b" style="padding:0 14px">
       <div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
         <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>
       </div></div>`;
@@ -1572,15 +1671,15 @@ function renderIncoming(){
   const money=v=>v===null?'<span class="zero">&ndash;</span>':fmt(v);
   const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
   const notes=[s.err?esc(s.err):'',inc.err?esc(inc.err):'',d&&n(d.stale_on_list)?n(d.stale_on_list)+' CRM membership'+(n(d.stale_on_list)===1?' is':'s are')+' past due, projection counts them as today':''].filter(Boolean);
-  return `<div class="card ${notes.length?'attn-box':''}"><div class="card-h"><span>Income</span><span class="grp-tot">${d?fmt(mtd)+' this month':''}</span></div>
-    <div class="card-b" style="padding:0 12px">
+  return `<div class="card ac-green ${notes.length?'attn-box':''}"><div class="card-h"><span class="ttl"><span class="icb ac">${ico('down')}</span><span>Income</span></span><span class="grp-tot">${d?fmt(mtd):''}</span></div>
+    <div class="card-b" style="padding:0 14px">
       <div class="inc-big"><div class="n">${money(mtd)}</div><div class="l">Collected this month${d?'<span class="sub">CRM '+fmt(n(d.crm_mtd))+' · Spark '+fmt(sparkMtd)+'</span>':'<span class="sub">tap Sync</span>'}</div></div>
       <div class="inc-proj"><span>Projected, rest of month <b>${money(rest)}</b></span><span>Full month <b>${d?fmt(mtd+rest):'&ndash;'}</b></span></div>
       <div class="inc">
-        <div class="cell"><div class="lbl">Next 30 days</div><div class="amt">${money(next30)}</div><div class="when">projected</div></div>
-        <div class="cell"><div class="lbl">Last 30 days</div><div class="amt">${money(last30)}</div><div class="when">collected</div></div>
-        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div>
-        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div>
+        <div class="cell"><span class="icb">${ico('cal')}</span><div><div class="lbl">Next 30 days</div><div class="amt">${money(next30)}</div><div class="when">projected</div></div></div>
+        <div class="cell"><span class="icb">${ico('bars')}</span><div><div class="lbl">Last 30 days</div><div class="amt">${money(last30)}</div><div class="when">collected</div></div></div>
+        <div class="cell ${s.onDeck?'hot':''}"><span class="icb">${ico('card')}</span><div><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div></div>
+        <div class="cell"><span class="icb">${ico('chev')}</span><div><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div></div>
       </div>
       ${d&&n(d.spark_members)?`<div class="tree-note">Spark, still moving over: ${n(d.spark_members)} member${n(d.spark_members)===1?'':'s'}, ${fmt0(n(d.spark_monthly))}/mo expected. CRM bills ${n(d.crm_members)}.</div>`:''}
       ${notes.map(x=>'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+x+'</div>').join('')}
@@ -1593,15 +1692,29 @@ function renderIncomingCard(hubs){
   const hubTot=hubs.reduce((t,x)=>t+(+x.a.balance||0),0);
   const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
   const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
-  const strip=s.key?`<div class="inc">
-        <div class="cell"><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div>
-        <div class="cell"><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div>
+  const strip=s.key?`<div class="inc" style="padding:12px 0 10px">
+        <div class="cell ${s.onDeck?'hot':''}"><span class="icb">${ico('card')}</span><div><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div></div>
+        <div class="cell"><span class="icb">${ico('chev')}</span><div><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div></div>
       </div>${s.err?'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+esc(s.err)+'</div>':''}
-      <div class="down">&darr; lands in</div>`:
+      <div class="down">${ico('cal')}Lands in</div>`:
     `<div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
         <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>`;
-  return `<div class="card"><div class="card-h"><span>Incoming</span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div>
-    <div class="card-b" style="padding:0 12px">${strip}${hubRows}${noHub}</div></div>`;
+  return `<div class="card ac-green"><div class="card-h"><span class="ttl"><span class="icb ac">${ico('down')}</span><span>Incoming</span></span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div>
+    <div class="card-b" style="padding:0 14px">${strip}${hubRows}${noHub}</div></div>`;
+}
+// Summary tile at the top of Accounts: total cash across every cash account, the hub total (incoming side)
+// and the dispatch total (outgoing side).
+function summaryTile(vis){
+  const cash=vis.filter(x=>!isDebtType(x.a.type));
+  const sum=l=>l.reduce((t,x)=>t+(+x.a.balance||0),0);
+  const tot=sum(cash), inc=sum(cash.filter(x=>x.a.role==='hub')), out=sum(cash.filter(x=>x.a.role==='dispatch'));
+  return `<div class="card ac-red"><div class="sum">
+    <span class="icb ac">${ico('coins')}</span>
+    <div><div class="l">Total funds</div><div class="big">${(tot<0?'-':'')+fmt(Math.abs(tot))}</div></div>
+    <div class="side">
+      <div><div class="l">Incoming</div><div class="v g">${ico('down')}${fmt(inc)}</div></div>
+      <div><div class="l">Outgoing</div><div class="v r">${ico('upright')}${fmt(out)}</div></div>
+    </div></div></div>`;
 }
 function homeView(v){ S.homeView=v; save(); renderHome(); }
 // By-bank view: one card per institution, every visible account under it, net total in the header.
@@ -1609,7 +1722,7 @@ function renderByBank(vis){
   const groups=new Map();
   vis.forEach(x=>{ const k=x.a.inst||'Other'; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(x); });
   const names=[...groups.keys()].sort((a,b)=>a==='Other'?1:b==='Other'?-1:a.localeCompare(b));
-  return names.map(k=>treeCard(esc(k),groups.get(k).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})))).join('');
+  return names.map(k=>treeCard(esc(k),groups.get(k).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{ac:'gold',ico:'bank'})).join('');
 }
 function renderHome(){
   const reg=acctRec(), b=bankRec();
@@ -1630,18 +1743,19 @@ function renderHome(){
   // so nothing nests under a dispatch account. `payer` is kept on the data for when that changes.
   const payoff=vis.filter(x=>x.a.type==='credit');
   const hubName=hubs.length?acctLabel(hubs[0].a):'';
+  if(vis.length)html+=summaryTile(vis);
   if(view==='bank'){
     html+=renderByBank(vis);
   }else{
     // Income has its own tab (2026-11-08) but incoming money stays here (Race: "incoming can still be
     // on accounts"): Stripe on deck / on the way, then the arrow down to the hub account it lands in.
     html+=renderIncomingCard(hubs);
-    if(savings.length)html+=treeCard('Cash & savings',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})));
+    if(savings.length)html+=treeCard('Cash & savings',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{ac:'gold',ico:'piggy'});
     if(disp.length){
-      html+=treeCard('Outgoing',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})));
+      html+=treeCard('Outgoing',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})),{ac:'red',ico:'upright'});
     }
-    if(loans.length)html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
-    if(payoff.length)html+=treeCard('Debt payoff targets',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true});
+    if(loans.length)html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true,ac:'red',ico:'car'});
+    if(payoff.length)html+=treeCard('Debt payoff targets',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true,ac:'red',ico:'target'});
   }
   if(!vis.length){
     html+=`<div class="card"><div class="card-b"><div class="note-line">No accounts yet. Add your accounts to see where your money is.</div>
@@ -1863,6 +1977,7 @@ function importGo(){
 // ── AUTH GATE ──────────────────────────────────────────────────────
 // No app UI (tabs, data) renders until a Supabase session exists.
 async function boot(){
+  fillIcons();
   $('auth-logo').src=$('hdr-logo').src; // reuse the one embedded logo, no second data URI
   // Service worker (pwa/sw.js, deployed beside index.html) makes the site installable + offline-openable.
   if('serviceWorker' in navigator&&location.protocol==='https:'){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
