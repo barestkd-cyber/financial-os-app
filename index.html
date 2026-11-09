@@ -338,6 +338,7 @@ tr:hover td{background:var(--hover);}
 .attn-box .card-b{color:var(--amber); font-size:12px;}
 .acct.nest{padding-left:16px; border-left:2px solid var(--soft); margin-left:4px;}
 .acct .flow{font-size:11px; color:var(--money); font-weight:600;}
+.acct .age{font-size:12px; color:var(--amber); font-weight:600;}
 .tree-note{font-size:11px; color:var(--muted); padding:7px 0 2px; line-height:1.5;}
 .inc{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;}
 .inc .cell{display:flex; align-items:center; gap:10px; background:var(--soft); border:1px solid var(--rule); border-radius:12px; padding:10px 12px; min-width:0;}
@@ -1637,6 +1638,16 @@ function acctAvail(a){
   return n;
 }
 function acctNow(a){ const v=acctAvail(a); return v===null?(+a.balance||0):v; }
+// Bank data age (Race, 2026-11-09, option 2): SimpleFIN refreshes about once a day, so a synced balance
+// older than 6 hours says when the bank last sent it instead of passing for live.
+function acctAge(a){
+  if(a.source!=='synced'||!a.asOf)return '';
+  const t=new Date(a.asOf*1000), age=Date.now()-t.getTime();
+  if(age<6*3600*1000)return '';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const time=t.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+  return 'bank data from '+(t>=today?time:t.toLocaleDateString(undefined,{weekday:'short'})+' '+time);
+}
 function acctRec(){
   if(!S.accounts){
     // First load on a pre-registry save: derive from the existing sync snapshot. Not a reseed.
@@ -1682,7 +1693,7 @@ function acctRowHTML(a,i,extra){
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
     <span class="icb">${ico(acctIco(a))}</span>
     <div><div class="nm">${esc(a.nick||a.name)}</div>
-      <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
+      <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${acctAge(a)?'<span class="age">'+acctAge(a)+'</span>':''}${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
     <div class="bal ${big<0?'neg':''}">${debt?fmt(Math.abs(bal)):(big<0?'-':'')+fmt(Math.abs(big))}${sub2?'<span class="asof">'+sub2+'</span>':''}</div>
   </div>`;
 }
@@ -1831,7 +1842,9 @@ function acctBalLabel(){ const l=$('m-bal-l'), t=$('m-type'); if(l&&t)l.textCont
 function acctOpen(i){
   const a=acctRec()[i]; if(!a)return;
   const synced=a.source==='synced', st=acctStatus(a), ledger=+a.balance||0, av=acctAvail(a), bal=av===null?ledger:av;
-  const avLine=av!==null&&Math.abs(ledger-av)>0.005?`<div class="note-line" style="margin:-6px 0 10px">Available. ${ledger-av>0?fmt(ledger-av)+' spent, not cleared':fmt(av-ledger)+' arriving'} · ${fmt(ledger)} ledger</div>`:'';
+  const age=acctAge(a);
+  const avLine=(av!==null&&Math.abs(ledger-av)>0.005?`<div class="note-line" style="margin:-6px 0 4px">Available. ${ledger-av>0?fmt(ledger-av)+' spent, not cleared':fmt(av-ledger)+' arriving'} · ${fmt(ledger)} ledger</div>`:'')
+    +(age?`<div class="note-line" style="margin:0 0 10px;color:var(--amber)">${age.charAt(0).toUpperCase()+age.slice(1)}. The bank feed refreshes about once a day.</div>`:'');
   openModal(`<h3>${esc(a.nick||a.name)}</h3>
     <div class="note-line" style="margin-bottom:8px">${esc(a.inst||'')}${a.inst?' · ':''}${ACCT_TYPES[a.type]||'Other'} · <span class="tag ${st[0]}">${st[1]}</span>
       ${synced&&a.stale?'<br>Not returned by the last sync. Relink this bank at bridge.simplefin.org.':''}</div>
