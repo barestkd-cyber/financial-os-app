@@ -424,6 +424,7 @@ tr:hover td{background:var(--hover);}
   <div class="tab" data-t="bills" onclick="showTab('bills')"><span data-ico="receipt"></span>Expenses</div>
   <div class="tab" data-t="budget" onclick="showTab('budget')"><span data-ico="pie"></span>Budget</div>
   <div class="tab" data-t="funds" onclick="showTab('funds')"><span data-ico="bucket"></span>Buckets</div>
+  <div class="tab" data-t="vault" onclick="showTab('vault')"><span data-ico="safe"></span>Funds</div>
   <div class="tab" data-t="txns" onclick="showTab('txns')"><span data-ico="swap"></span>Transactions</div>
   <div class="tab" data-t="debt" onclick="showTab('debt')"><span data-ico="card"></span>Debt</div>
   <div class="tab" data-t="month" onclick="showTab('month')"><span data-ico="bars"></span>Month-End</div>
@@ -525,7 +526,12 @@ tr:hover td{background:var(--hover);}
   <div class="sec-lbl" style="margin-top:6px"><span data-ico="layers"></span>Expense buckets</div>
   <div class="bk-sub" id="bk-sub"></div>
   <div class="fund-grid" id="bucket-grid"></div>
-  <div class="sec-lbl"><span data-ico="safe"></span>Funds</div>
+</div></div>
+
+<!-- FUNDS: savings for purchases, not monthly expenses (Race, 2026-11-08). Own tab, off the Buckets page. -->
+<div class="page" id="p-vault"><div class="wrap">
+  <div class="note-line" style="margin:0 0 6px; font-size:13px;">Savings for purchases. Monthly expenses live in Buckets.</div>
+  <div class="sec-lbl" style="margin-top:6px"><span data-ico="safe"></span>Funds</div>
   <div class="fund-grid" id="fund-grid"></div>
   <div style="margin-top:12px;"><button class="small-btn" onclick="addFund()"><span data-ico="plus"></span>New fund</button></div>
 </div></div>
