@@ -951,19 +951,22 @@ function renderWkHistory(){
 }
 
 // ── FUNDS ──────────────────────────────────────────────────────────
-// Buckets page: one card per expense (bucket vs cap, next Monday's contribution, behind flag),
-// then the standalone funds. "Behind" = the bucket plus the Mondays left before the due day
-// would not cover the amount. Display only; nothing here moves money on its own.
+// Buckets page: one card per expense (bucket vs cap, this Monday's contribution, behind flag),
+// then the standalone funds. Weekly = what the bucket still needs for the next payment, split
+// evenly over the Mondays left before its due day (Race, 2026-11-08/21). Once this month's payment
+// is logged the next due day is next month's. The split always lands by the due day, so "Behind"
+// only remains when no Monday is left and the bucket is short. Display only; nothing moves money.
 function nextMonday(from){ const d=new Date(from); d.setHours(0,0,0,0); d.setDate(d.getDate()+((8-d.getDay())%7||7)); return d; }
 function bucketPlan(b){
   const p=billPlan(b); if(p.kind==='asneeded')return Object.assign(p,{weekly:0,behind:false,mondays:0});
-  const weekly=p.amt*12/52, today=new Date(), dd=dueDay(b);
-  let mondays=0, behind=false;
-  if(dd){
-    let due=new Date(today.getFullYear(),today.getMonth(),dd); if(due<today)due=new Date(today.getFullYear(),today.getMonth()+1,dd);
-    for(let d=nextMonday(today); d<=due; d.setDate(d.getDate()+7))mondays++;
-    behind=p.bucket+weekly*mondays<p.amt-0.005&&mTotal(b.act||{},actKey(b,ymNow()))<=0;
-  }
+  const today=new Date(); today.setHours(0,0,0,0); const dd=dueDay(b);
+  if(!dd)return Object.assign(p,{weekly:p.amt*12/52,behind:false,mondays:0});
+  const paid=mTotal(b.act||{},actKey(b,ymNow()))>0;
+  let due=new Date(today.getFullYear(),today.getMonth(),dd);
+  if(due<today||paid)due=new Date(today.getFullYear(),today.getMonth()+1,dd);
+  let mondays=0; for(let d=nextMonday(today); d<=due; d.setDate(d.getDate()+7))mondays++;
+  const short=Math.max(0,p.amt-p.bucket);
+  const weekly=mondays?short/mondays:short, behind=!mondays&&short>0.005;
   return Object.assign(p,{weekly,behind,mondays});
 }
 function bucketCardHTML(grp,b){
@@ -973,7 +976,7 @@ function bucketCardHTML(grp,b){
   // red "Behind" word), and next Monday's date is shown once above the grid, so the footer is just
   // this week's amount and the due day.
   const next=p.kind==='asneeded'?'As needed':
-    `${p.behind?'<span class="bh">Behind</span> · ':''}<span><b>${fmt0(p.weekly)}</b> Mon${b.due?' · due '+esc(b.due):''}</span>`;
+    `${p.behind?'<span class="bh">Behind</span> · ':''}<span><b>${fmt0(p.weekly)}</b> ${p.behind?'now':'Mon'}${b.due?' · due '+esc(b.due):''}</span>`;
   return `<div class="fund ${full?'full':''} ${p.behind?'behind':''}">
     <div class="top"><span class="dot" style="background:${k[1]}" title="${k[0]}"></span><span class="nm">${esc(b.name)}</span>
       <span class="amt"><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt0(p.bucket)}</b>${p.cap?'<span class="of"> / </span><span class="tgt">'+fmt0(p.cap)+'</span>':''}</span></div>
