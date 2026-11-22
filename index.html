@@ -1759,7 +1759,7 @@ function renderByBank(vis){
     const rx=TYPE_RANK[x.a.type]??3, ry=TYPE_RANK[y.a.type]??3; if(rx!==ry)return rx-ry;
     return isDebtType(x.a.type)?Math.abs(+y.a.balance||0)-Math.abs(+x.a.balance||0):acctNow(y.a)-acctNow(x.a);
   };
-  return names.map(k=>treeCard(esc(k),groups.get(k).sort(byRank).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{noInst:true})})),{ac:'gold',ico:'bank'})).join('');
+  return names.map(k=>treeCard(esc(k),groups.get(k).sort(byRank).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{noInst:true})})),{ac:'green',ico:'bank'})).join('');
 }
 function renderHome(){
   const reg=acctRec(), b=bankRec();
