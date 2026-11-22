@@ -451,7 +451,6 @@ tr:hover td{background:var(--hover);}
   <div class="home-top">
     <div><div class="home-q">Accounts overview</div><div class="home-sub" id="home-sub"></div></div>
     <div class="home-acts">
-      <div class="seg" id="home-view"><span data-v="flow" onclick="homeView('flow')"><span data-ico="layers"></span>By category</span><span data-v="bank" onclick="homeView('bank')"><span data-ico="bank"></span>By bank</span></div>
       <button class="small-btn" id="home-sync-btn" onclick="syncAll(true)"><span data-ico="refresh"></span>Sync</button>
       <button class="small-btn" onclick="addAccount()"><span data-ico="plus"></span>Add Account</button>
     </div>
@@ -1696,20 +1695,19 @@ function acctRowHTML(a,i,extra){
   return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
     <span class="icb">${ico(acctIco(a))}</span>
     <div><div class="nm">${esc(a.nick||a.name)}</div>
-      <div class="sub">${a.inst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${acctAge(a)?'<span class="age">'+acctAge(a)+'</span>':''}${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
+      <div class="sub">${a.inst&&!x.noInst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${acctAge(a)?'<span class="age">'+acctAge(a)+'</span>':''}${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
     <div class="bal ${big<0?'neg':''}">${debt?fmt(Math.abs(bal)):(big<0?'-':'')+fmt(Math.abs(big))}${sub2?'<span class="asof">'+sub2+'</span>':''}</div>
   </div>`;
 }
-// Money tree: Income -> Hub -> Dispatch (with the cards each one pays) -> Savings -> Loans -> Payoff targets.
-// Roles live on the accounts themselves (role: hub|dispatch, feed: $/wk from the hub, payer: account id
-// that pays a card). Accounts with no role fall into Savings & other / Payoff, so a fresh registry still renders.
+// Accounts tab (Race, 2026-11-21): just the accounts, one card per bank, nothing else. No summary tile,
+// no Incoming/Outgoing, no category titles, no totals. The money-tree roles (role: hub|dispatch, feed,
+// payer) stay on the data and in the account modal but nothing on this page uses them.
 function acctLabel(a){ return a?(a.nick||a.name):''; }
-// opts: debt (owed wording), ac (green|gold|red|grey accent), ico (header icon), before/after html.
+// opts: ac (green|gold|red|grey accent), ico (header icon), tot (header total text, omitted when blank).
 function treeCard(title,rows,opts){
-  const o=opts||{}, tot=rows.reduce((s,x)=>s+acctNow(x.a),0);
-  const totTxt=o.debt?fmt(Math.abs(tot))+(tot<0?' owed':''):(tot<0?'-':'')+fmt(Math.abs(tot));
-  return `<div class="card ac-${o.ac||'grey'}"><div class="card-h"><span class="ttl"><span class="icb ac">${ico(o.ico||'bank')}</span><span>${title}</span></span><span class="grp-tot ${tot<0?'neg':''}">${totTxt}</span></div>
-    <div class="card-b" style="padding:0 14px">${o.before||''}${rows.map(x=>x.html).join('')}${o.after||''}</div></div>`;
+  const o=opts||{};
+  return `<div class="card ac-${o.ac||'grey'}"><div class="card-h"><span class="ttl"><span class="icb ac">${ico(o.ico||'bank')}</span><span>${title}</span></span>${o.tot?'<span class="grp-tot">'+o.tot+'</span>':''}</div>
+    <div class="card-b" style="padding:0 14px">${rows.map(x=>x.html).join('')}</div></div>`;
 }
 // Income card: income only, no account balances (Race, 2026-11-08: "separate income and accounts").
 // The hub account is tagged "income lands here" on the Accounts tab instead.
@@ -1751,44 +1749,26 @@ function renderIncoming(){
       ${notes.map(x=>'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+x+'</div>').join('')}
       </div></div>`;
 }
-// Accounts tab: money on its way in (Stripe) and the hub account it lands in.
-function renderIncomingCard(hubs){
-  const s=stripeRec();
-  const hubRows=hubs.map(x=>acctRowHTML(x.a,x.i)).join('');
-  const hubTot=hubs.reduce((t,x)=>t+acctNow(x.a),0);
-  const noHub=hubs.length?'':`<div class="note-line" style="padding:8px 0">No hub yet. Tap the account your income lands in and set its role to Hub.</div>`;
-  const when=s.arrival?'arriving '+new Date(s.arrival*1000).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):'';
-  const strip=s.key?`<div class="inc" style="padding:12px 0 10px">
-        <div class="cell ${s.onDeck?'hot':''}"><span class="icb">${ico('card')}</span><div><div class="lbl">On deck</div><div class="amt ${s.onDeck?'':'zero'}">${fmt(s.onDeck||0)}</div><div class="when">Stripe</div></div></div>
-        <div class="cell"><span class="icb">${ico('chev')}</span><div><div class="lbl">On the way</div><div class="amt ${s.onWay?'':'zero'}">${fmt(s.onWay||0)}</div><div class="when">${s.onWay?when:'Stripe'}</div></div></div>
-      </div>${s.err?'<div class="note-line" style="color:var(--amber);margin:0;padding:4px 0">'+esc(s.err)+'</div>':''}
-      <div class="down">${ico('cal')}Lands in</div>`:
-    `<div class="note-line" style="padding:8px 0">Show money that is on its way from Stripe before it lands in the bank.
-        <button class="small-btn primary" style="margin-left:6px" onclick="stripeConnect()">Connect Stripe</button></div>`;
-  return `<div class="card ac-green"><div class="card-h"><span class="ttl"><span class="icb ac">${ico('down')}</span><span>Incoming</span></span><span class="grp-tot">${hubs.length?fmt(hubTot):''}</span></div>
-    <div class="card-b" style="padding:0 14px">${strip}${hubRows}${noHub}</div></div>`;
-}
-// Summary tile at the top of Accounts: total cash across every cash account, the hub total (incoming side)
-// and the dispatch total (outgoing side).
-function summaryTile(vis){
-  const cash=vis.filter(x=>!isDebtType(x.a.type));
-  const sum=l=>l.reduce((t,x)=>t+acctNow(x.a),0);
-  const tot=sum(cash), inc=sum(cash.filter(x=>x.a.role==='hub')), out=sum(cash.filter(x=>x.a.role==='dispatch'));
-  return `<div class="card ac-red"><div class="sum">
-    <span class="icb ac">${ico('coins')}</span>
-    <div><div class="l">Total funds</div><div class="big">${(tot<0?'-':'')+fmt(Math.abs(tot))}</div></div>
-    <div class="side">
-      <div><div class="l">Incoming</div><div class="v g">${ico('down')}${fmt(inc)}</div></div>
-      <div><div class="l">Outgoing</div><div class="v r">${ico('upright')}${fmt(out)}</div></div>
-    </div></div></div>`;
-}
-function homeView(v){ S.homeView=v; save(); renderHome(); }
-// By-bank view: one card per institution, every visible account under it, net total in the header.
+// One card per bank, banks in importance order: banks holding cash accounts first (most cash at the
+// top), then card-only banks (most owed at the top), manual blanks as Other last. Inside a bank: cash
+// accounts by balance, then credit cards, then loans. The bank name is the only title; no totals.
+const TYPE_RANK={checking:0,savings:1,cash:2,other:3,credit:4,loan:5};
 function renderByBank(vis){
   const groups=new Map();
   vis.forEach(x=>{ const k=x.a.inst||'Other'; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(x); });
-  const names=[...groups.keys()].sort((a,b)=>a==='Other'?1:b==='Other'?-1:a.localeCompare(b));
-  return names.map(k=>treeCard(esc(k),groups.get(k).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{ac:'gold',ico:'bank'})).join('');
+  const cashOf=l=>l.filter(x=>!isDebtType(x.a.type)).reduce((t,x)=>t+acctNow(x.a),0);
+  const owedOf=l=>l.filter(x=>isDebtType(x.a.type)).reduce((t,x)=>t+Math.abs(+x.a.balance||0),0);
+  const names=[...groups.keys()].sort((a,b)=>{
+    if(a==='Other'||b==='Other')return a==='Other'?1:-1;
+    const ga=groups.get(a), gb=groups.get(b), ca=ga.some(x=>!isDebtType(x.a.type)), cb=gb.some(x=>!isDebtType(x.a.type));
+    if(ca!==cb)return ca?-1:1;
+    return ca?cashOf(gb)-cashOf(ga):owedOf(gb)-owedOf(ga);
+  });
+  const byRank=(x,y)=>{
+    const rx=TYPE_RANK[x.a.type]??3, ry=TYPE_RANK[y.a.type]??3; if(rx!==ry)return rx-ry;
+    return isDebtType(x.a.type)?Math.abs(+y.a.balance||0)-Math.abs(+x.a.balance||0):acctNow(y.a)-acctNow(x.a);
+  };
+  return names.map(k=>treeCard(esc(k),groups.get(k).sort(byRank).map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{noInst:true})})),{ac:'gold',ico:'bank'})).join('');
 }
 function renderHome(){
   const reg=acctRec(), b=bankRec();
@@ -1798,31 +1778,7 @@ function renderHome(){
     html+=`<div class="card attn-box"><div class="card-b">${b.lastErrors.map(esc).join('<br>')}
       <div class="note-line">Fix the connection at bridge.simplefin.org, then Sync.</div></div></div>`;
   }
-  const view=S.homeView==='bank'?'bank':'flow';
-  document.querySelectorAll('#home-view span').forEach(el=>el.classList.toggle('on',el.dataset.v===view));
-  const cash=x=>!isDebtType(x.a.type);
-  const hubs=vis.filter(x=>cash(x)&&x.a.role==='hub');
-  const disp=vis.filter(x=>cash(x)&&x.a.role==='dispatch');
-  const savings=vis.filter(x=>cash(x)&&x.a.role!=='hub'&&x.a.role!=='dispatch');
-  const loans=vis.filter(x=>x.a.type==='loan');
-  // Every card is a payoff target for now (Race, 2026-11-06): none are being used to pay bills,
-  // so nothing nests under a dispatch account. `payer` is kept on the data for when that changes.
-  const payoff=vis.filter(x=>x.a.type==='credit');
-  const hubName=hubs.length?acctLabel(hubs[0].a):'';
-  if(vis.length)html+=summaryTile(vis);
-  if(view==='bank'){
-    html+=renderByBank(vis);
-  }else{
-    // Income has its own tab (2026-11-08) but incoming money stays here (Race: "incoming can still be
-    // on accounts"): Stripe on deck / on the way, then the arrow down to the hub account it lands in.
-    html+=renderIncomingCard(hubs);
-    if(savings.length)html+=treeCard('Cash & savings',savings.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{ac:'gold',ico:'piggy'});
-    if(disp.length){
-      html+=treeCard('Outgoing',disp.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i,{flow:+x.a.feed>0&&hubName?fmt0(+x.a.feed)+'/wk from '+hubName:''})})),{ac:'red',ico:'upright'});
-    }
-    if(loans.length)html+=treeCard('Loans',loans.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true,ac:'red',ico:'car'});
-    if(payoff.length)html+=treeCard('Debt payoff targets',payoff.map(x=>({a:x.a,html:acctRowHTML(x.a,x.i)})),{debt:true,ac:'red',ico:'target'});
-  }
+  html+=renderByBank(vis);
   if(!vis.length){
     html+=`<div class="card"><div class="card-b"><div class="note-line">No accounts yet. Add your accounts to see where your money is.</div>
       <div style="margin-top:8px"><button class="small-btn primary" onclick="addAccount()">+ Add Account</button></div></div></div>`;
