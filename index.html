@@ -676,7 +676,7 @@ function fillIcons(){ document.querySelectorAll('[data-ico]').forEach(el=>{ el.i
 function acctIco(a){
   const n=(a.nick||a.name||'').toLowerCase();
   if(/tax/.test(n))return 'percent';
-  if(/broker|invest/.test(n))return 'bars';
+  if(a.type==='invest'||/broker|invest/.test(n))return 'bars';
   if(/save your way|emergency|vault/.test(n))return 'safe';
   if(a.type==='credit')return 'card';
   if(a.type==='loan')return /escalade|cadillac|car|auto|truck/.test(n)?'car':'doc';
@@ -1619,7 +1619,7 @@ function bankPasteGo(){
 // credit/loan accounts store the signed balance (negative = owed), so a
 // manual card entered as "owed 500" is stored as -500. Per-account
 // transactions and virtual buckets will hang off these ids later.
-const ACCT_TYPES={checking:'Checking',savings:'Savings',cash:'Cash',credit:'Credit card',loan:'Loan',other:'Other'};
+const ACCT_TYPES={checking:'Checking',savings:'Savings',cash:'Cash',invest:'Investing',credit:'Credit card',loan:'Loan',other:'Other'};
 const isDebtType=t=>t==='credit'||t==='loan';
 // Available vs ledger (Race, 2026-11-09: "available first, then spent and ledger"). For synced cash accounts
 // the bank's available balance is the spendable number. 0 with a non-zero ledger means "not reported"
@@ -1743,7 +1743,7 @@ function renderIncoming(){
 // One card per bank, banks in importance order: banks holding cash accounts first (most cash at the
 // top), then card-only banks (most owed at the top), manual blanks as Other last. Inside a bank: cash
 // accounts by balance, then credit cards, then loans. The bank name is the only title; no totals.
-const TYPE_RANK={checking:0,savings:1,cash:2,other:3,credit:4,loan:5};
+const TYPE_RANK={checking:0,savings:1,cash:2,invest:3,other:3,credit:4,loan:5};
 function renderByBank(vis){
   const groups=new Map();
   vis.forEach(x=>{ const k=x.a.inst||'Other'; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(x); });
