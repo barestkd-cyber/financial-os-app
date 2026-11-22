@@ -43,7 +43,7 @@
 body{
   font-family:'Archivo',-apple-system,'Segoe UI',Arial,sans-serif;
   background:var(--paper); color:var(--ink); font-size:14px;
-  height:100vh; display:flex; flex-direction:column; overflow:hidden;
+  height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden;
 }
 :root[data-theme="dark"] body{background:radial-gradient(120% 60% at 100% 0%, var(--belt-tint) 0%, var(--paper) 45%) fixed;}
 svg.ic{width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; flex:none;}
@@ -112,7 +112,7 @@ header{grid-column:1 / -1;}
   .tabs.open{transform:translateX(0);}
   #nav-scrim.open{display:block;}
   .bbar{display:flex;}
-  .page{padding:12px 12px 84px;}
+  .page{padding:12px 12px calc(100px + env(safe-area-inset-bottom));}
   .page.active{grid-column:1;}
 }
 
@@ -290,9 +290,8 @@ tr:hover td{background:var(--hover);}
 .sum .side .v{font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:3px;}
 .sum .side .v.g{color:var(--money);}
 .sum .side .v.r{color:var(--belt);}
-.acct{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
+.acct{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--soft);}
 .acct:last-child{border-bottom:none;}
-.acct:hover{background:var(--hover);}
 .acct .nm{font-weight:700; font-size:15px;}
 .acct .sub{font-size:12px; color:var(--muted); margin-top:2px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
 .acct .bal{margin-left:auto; text-align:right; font-weight:800; font-size:24px; font-variant-numeric:tabular-nums; white-space:nowrap;}
@@ -1692,7 +1691,7 @@ function acctRowHTML(a,i,extra){
   if(av!==null&&Math.abs(diff)>0.005)avail=(diff>0?fmt(diff)+' spent':fmt(-diff)+' arriving')+' · '+fmt(bal)+' ledger';
   const sub2=[debt&&bal<0?'owed':'',avail].filter(Boolean).join(' · ');
   const x=extra||{};
-  return `<div class="acct ${x.nest?'nest':''}" onclick="acctOpen(${i})">
+  return `<div class="acct ${x.nest?'nest':''}">
     <span class="icb">${ico(acctIco(a))}</span>
     <div><div class="nm">${esc(a.nick||a.name)}</div>
       <div class="sub">${a.inst&&!x.noInst?'<span>'+esc(a.inst)+'</span>':''}<span>${ACCT_TYPES[a.type]||'Other'}</span><span class="tag ${st[0]}">${st[1]}</span>${acctAge(a)?'<span class="age">'+acctAge(a)+'</span>':''}${x.flow?'<span class="flow">'+esc(x.flow)+'</span>':''}</div></div>
