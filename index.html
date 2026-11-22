@@ -759,6 +759,7 @@ function defaults(){return {
   income:{lastSync:0,data:null,err:''},
   budgetBucket:0,
   homeView:'flow',
+  bankOrder:[],
 };}
 // localStorage is an offline mirror only. Supabase (table fos_state, one
 // jsonb row per user) is the source of truth. Every save() writes the mirror
@@ -1749,7 +1750,11 @@ function renderByBank(vis){
   vis.forEach(x=>{ const k=x.a.inst||'Other'; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(x); });
   const cashOf=l=>l.filter(x=>!isDebtType(x.a.type)).reduce((t,x)=>t+acctNow(x.a),0);
   const owedOf=l=>l.filter(x=>isDebtType(x.a.type)).reduce((t,x)=>t+Math.abs(+x.a.balance||0),0);
+  // S.bankOrder (bank names, set per user in the data) pins the order; banks not listed follow
+  // under the automatic rule below.
+  const pin=Array.isArray(S.bankOrder)?S.bankOrder:[], pos=k=>{ const i=pin.indexOf(k); return i<0?pin.length:i; };
   const names=[...groups.keys()].sort((a,b)=>{
+    if(pos(a)!==pos(b))return pos(a)-pos(b);
     if(a==='Other'||b==='Other')return a==='Other'?1:-1;
     const ga=groups.get(a), gb=groups.get(b), ca=ga.some(x=>!isDebtType(x.a.type)), cb=gb.some(x=>!isDebtType(x.a.type));
     if(ca!==cb)return ca?-1:1;
