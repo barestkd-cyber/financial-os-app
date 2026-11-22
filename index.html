@@ -299,9 +299,8 @@ tr:hover td{background:var(--hover);}
 .acct .bal .asof{display:block; font-size:11px; font-weight:500; color:var(--muted);}
 .grp-tot{font-variant-numeric:tabular-nums; text-transform:none; letter-spacing:0; font-size:24px; font-weight:800; color:var(--ink); white-space:nowrap;}
 .grp-tot.neg{color:var(--belt);}
-.exp{display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--soft); cursor:pointer;}
+.exp{display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--soft);}
 .exp:last-child{border-bottom:none;}
-.exp:hover{background:var(--hover);}
 .exp .l{flex:1; min-width:0; display:flex; align-items:baseline; gap:6px; white-space:nowrap; overflow:hidden;}
 .exp .dot{width:7px; height:7px; border-radius:50%; flex:none; align-self:center;}
 .exp .nm{font-weight:700; flex:none;}
@@ -539,7 +538,6 @@ tr:hover td{background:var(--hover);}
 <div class="page" id="p-bills"><div class="wrap">
   <div class="home-top">
     <div><div class="home-q">What does it cost to run everything?</div><div class="home-sub" id="exp-sub"></div></div>
-    <div style="display:flex; gap:6px;"><button class="small-btn primary" onclick="addBill()">+ Add expense</button></div>
   </div>
   <div class="tiles" id="exp-tiles"></div>
   <div id="exp-groups"></div>
@@ -979,11 +977,7 @@ function bucketCardHTML(grp,b){
     <div class="top"><span class="dot" style="background:${k[1]}" title="${k[0]}"></span><span class="nm">${esc(b.name)}</span>
       <span class="amt"><b style="color:${p.bucket<0?'var(--belt)':'var(--ink)'}">${fmt0(p.bucket)}</b>${p.cap?'<span class="of"> / </span><span class="tgt">'+fmt0(p.cap)+'</span>':''}</span></div>
     ${p.cap?`<div class="bar"><div class="fill" style="width:${pct}%"></div></div>`:''}
-    <div class="foot"><div class="next">${next}</div>
-      <button class="ib green" title="Add" onclick="bucketMove('${grp}',${b.id},1)">${ico('plus')}</button>
-      <button class="ib" title="Take" onclick="bucketMove('${grp}',${b.id},-1)">${ico('minus')}</button>
-      <button class="ib" title="Edit" onclick="billOpen('${grp}',${b.id})">${ico('edit')}</button>
-    </div>
+    <div class="foot"><div class="next">${next}</div></div>
   </div>`;
 }
 function bucketMove(grp,id,dir){
@@ -1006,9 +1000,6 @@ function budgetBucketCardHTML(){
       <span class="amt"><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt0(inB)}</b><span class="of"> / </span><span class="tgt">${fmt0(amt)}</span></span></div>
     <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
     <div class="foot"><div class="next"><span><b>${fmt0(amt*12/52)}</b> Mon</span></div>
-      <button class="ib green" title="Add" onclick="budgetBucketMove(1)">${ico('plus')}</button>
-      <button class="ib" title="Take" onclick="budgetBucketMove(-1)">${ico('minus')}</button>
-      <button class="ib" title="Budget" onclick="showTab('budget')">${ico('pie')}</button>
     </div>
   </div>`;
 }
@@ -1145,7 +1136,7 @@ function expRowHTML(grp,b){
   // One line per expense: type dot, name, then the small details inline (due day, paid from, and
   // Pending only when the payment method still needs switching). No paid/due/late chip.
   const sub=[b.due?esc(b.due):'',payAcctLabel(b),b.pay==='pending'?'<span class="t-pending">Pending</span>':''].filter(Boolean).join(' · ');
-  return `<div class="exp ${ms[0]==='paid'?'paid':''}" onclick="billOpen('${grp}',${b.id})" title="${k[0]}">
+  return `<div class="exp ${ms[0]==='paid'?'paid':''}" title="${k[0]}">
     <div class="l"><span class="dot" style="background:${k[1]}"></span><span class="nm">${esc(b.name)}</span><span class="sub">${sub}</span></div>
     <div class="m"><div class="pair">${pair}</div>${p.kind==='asneeded'?'':`<div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div>`}</div>
   </div>`;
@@ -1155,7 +1146,7 @@ function expRowHTML(grp,b){
 const budgetTotal=()=>(S.budget||[]).reduce((s,c)=>s+(+c.tgt||0),0);
 function budgetRowHTML(){
   const amt=budgetTotal(), inB=+S.budgetBucket||0, pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
-  return `<div class="exp" onclick="showTab('budget')" title="Average">
+  return `<div class="exp" title="Average">
     <div class="l"><span class="dot" style="background:var(--amber)"></span><span class="nm">Spending budget</span><span class="sub">${(S.budget||[]).length} categories on the Budget tab</span></div>
     <div class="m"><div class="pair"><span class="in ${inB<0?'neg':''}">${fmt0(inB)}</span> <span style="color:var(--faint)">/</span> <span class="of">${fmt0(amt)}</span></div><div class="bar"><div class="fill ${pct<100?'short':''}" style="width:${pct}%"></div></div></div>
     <div class="st"><span class="tag st-due">Budget</span></div>
