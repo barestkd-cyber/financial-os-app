@@ -231,6 +231,31 @@ tr:hover td{background:var(--hover);}
 .alloc .amt{font-weight:800; font-size:17px; min-width:84px; text-align:right; font-variant-numeric:tabular-nums;}
 .alloc .what{flex:1;}
 .alloc .what .d{font-size:11px; color:var(--muted);}
+/* Transactions tab: one row per bank transaction with a category chip (Race, 2026-11-21). */
+.tx-filters{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 12px;}
+.tx-filters select,.tx-filters input{padding:7px 10px; font-size:13px; border-radius:9px; max-width:100%;}
+.tx-filters input{flex:1; min-width:120px;}
+.tx{display:grid; grid-template-columns:40px minmax(0,1fr) auto auto; gap:2px 10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--soft);}
+.tx:last-child{border-bottom:none;}
+.tx > div{min-width:0;}
+.tx .d{font-size:12px; color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums;}
+.tx .n{font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.tx .s{font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.tx .a{font-weight:800; font-size:17px; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.tx .a.in{color:var(--money);}
+.cat{font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; border:1px solid var(--rule); background:var(--field); color:var(--ink); cursor:pointer; font-family:inherit; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis;}
+.cat.todo{border-color:var(--amber); color:var(--amber); background:var(--amber-tint);}
+.cat.on{border-color:var(--money); color:var(--money); background:var(--money-tint);}
+.cat.quiet{color:var(--muted);}
+.cat-grp{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:10px 0 4px;}
+.cat-opts{display:flex; flex-wrap:wrap; gap:6px;}
+.chk-line{display:flex; align-items:center; gap:8px; font-size:13px; margin:4px 0 2px; cursor:pointer;}
+.chk-line input{width:auto;}
+@media(max-width:640px){
+  .tx{grid-template-columns:40px minmax(0,1fr) auto;}
+  .tx .cat{grid-column:2; grid-row:2; justify-self:start;}
+  .tx .a{grid-column:3; grid-row:1;}
+}
 .surplus-box{
   background:var(--box); color:#fff; border-radius:6px; padding:12px 14px; margin-top:10px;
   display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
@@ -566,7 +591,7 @@ tr:hover td{background:var(--hover);}
     </div>
     <div class="card-b" id="bud-rows"></div>
   </div>
-  <div class="note-line">Tap "+ spend" when money leaves. Groceries target is $0 on purpose — the benefit card covers food. Anything logged there is leakage worth seeing.</div>
+  <div class="note-line">Spending comes from categorized transactions on the Transactions tab. Groceries target is $0 on purpose: the benefit card covers food, so anything landing there is leakage worth seeing.</div>
 </div></div>
 
 <!-- MONTH -->
@@ -605,15 +630,22 @@ tr:hover td{background:var(--hover);}
   <div class="note-line">Read-only sync via SimpleFIN. Balances and new transactions come in together on every sync.</div>
 </div></div>
 
-<!-- TRANSACTIONS -->
+<!-- TRANSACTIONS: every bank transaction (fos_txns table), categorized for the Budget tab -->
 <div class="page" id="p-txns"><div class="wrap">
-  <div class="card">
-    <div class="card-h">Transactions to review
-      <span><button class="small-btn" onclick="bankPaste()">Paste JSON</button> <button class="small-btn" onclick="syncAll(true)">Sync</button></span>
+  <div class="home-top">
+    <div><div class="home-q" id="tx-month">Transactions</div><div class="home-sub" id="tx-sub"></div></div>
+    <div class="home-acts">
+      <button class="small-btn" onclick="txMonth(-1)" title="Previous month">&#9664;</button>
+      <button class="small-btn" onclick="txMonth(1)" title="Next month">&#9654;</button>
+      <button class="small-btn" id="tx-sync-btn" onclick="syncAll(true)"><span data-ico="refresh"></span>Sync</button>
     </div>
-    <div class="card-b" id="bank-inbox"></div>
   </div>
-  <div class="note-line">New transactions arrive with every sync. Log each one where it belongs: budget spending, a bill payment, or income.</div>
+  <div class="tx-filters">
+    <div class="seg" id="tx-mode"><span data-v="todo" onclick="txMode('todo')">To do</span><span data-v="all" onclick="txMode('all')">All</span></div>
+    <select id="tx-acct" onchange="txAcct(this.value)"><option value="">All accounts</option></select>
+    <input id="tx-q" placeholder="Search" oninput="txSearch(this.value)">
+  </div>
+  <div class="card ac-green"><div class="card-b" id="tx-list" style="padding:0 14px"></div></div>
 </div></div>
 
 </div><!-- /#app -->
@@ -760,6 +792,7 @@ function defaults(){return {
   budgetBucket:0,
   homeView:'flow',
   bankOrder:[],
+  txnRules:{},
 };}
 // localStorage is an offline mirror only. Supabase (table fos_state, one
 // jsonb row per user) is the source of truth. Every save() writes the mirror
@@ -855,6 +888,8 @@ function showTab(t){
   $('p-'+t).classList.add('active');
   // Stripe is checked with every bank sync (auto on open when the last sync is >6h old, or the Sync button).
   if((t==='banks'||t==='home'||t==='income'||t==='txns')&&S&&bankRec().url&&Date.now()-bankRec().lastSync>6*3600*1000)syncAll(false);
+  if(t==='txns'&&S)loadTxns(false);
+  if(t==='budget'&&S)budgetLoad();
 }
 function syncAll(manual){ bankSync(manual); if(stripeRec().key)stripeSync(manual); incomeSync(manual); }
 
@@ -1319,15 +1354,27 @@ function budMonth(dir){
   const[y,m]=budM.split('-').map(Number);
   const d=new Date(y,m-1+dir,1);
   budM=d.toISOString().slice(0,7);
-  renderBudget();
+  budgetLoad();
+}
+// Spending per category = categorized transactions in fos_txns for the month (TXB cache, budgetLoad)
+// plus anything hand-logged in the legacy S.spend. The "+ spend" button went with the move to
+// transactions (2026-11-21); spendModal/spendGo stay in the file, unreachable.
+const TXB={month:'',sums:{}};
+async function budgetLoad(){
+  if(!sbUser||TXB.month===budM){ renderBudget(); return; }
+  const[a,z]=monthRange(budM);
+  const {data,error}=await sb.from('fos_txns').select('cat,amount').eq('user_id',sbUser.id).gte('posted',a).lt('posted',z).like('cat','b:%').limit(5000);
+  if(error){ renderBudget(); return; }
+  const sums={}; (data||[]).forEach(r=>{ if(!r.cat||!String(r.cat).startsWith('b:'))return; const id=r.cat.slice(2); sums[id]=(sums[id]||0)-(+r.amount||0); });
+  TXB.month=budM; TXB.sums=sums; renderBudget();
 }
 function renderBudget(){
   const[y,m]=budM.split('-').map(Number);
   $('bud-month').textContent=MNAMES[m-1]+' '+y;
-  const sp=S.spend[budM]||{};
+  const sp=S.spend[budM]||{}, tx=TXB.month===budM?TXB.sums:{};
   let totT=0, totS=0;
   $('bud-rows').innerHTML=S.budget.map(c=>{
-    const spent=(sp[c.id]||[]).reduce((a,b)=>a+b,0);
+    const spent=(sp[c.id]||[]).reduce((a,b)=>a+b,0)+(tx[String(c.id)]||0);
     totT+=c.tgt; totS+=spent;
     const pct=c.tgt>0?Math.min(100,spent/c.tgt*100):(spent>0?100:0);
     const over=c.tgt>0?spent>c.tgt:spent>0;
@@ -1335,11 +1382,10 @@ function renderBudget(){
       <div class="bud-name">${c.name}</div>
       <div class="bud-bar"><div class="bud-fill ${over?'over':''}" style="width:${pct}%"></div></div>
       <div class="bud-nums">${fmt0(spent)} / ${fmt0(c.tgt)}<div class="left">${c.tgt-spent>=0?fmt0(c.tgt-spent)+' left':fmt0(spent-c.tgt)+' OVER'}</div></div>
-      <button class="small-btn" onclick="spendModal(${c.id})">+ spend</button>
     </div>`;
   }).join('')+`<div class="bud-row" style="border-top:2px solid var(--rule);font-weight:700">
     <div class="bud-name">Total</div><div class="bud-bar"></div>
-    <div class="bud-nums">${fmt0(totS)} / ${fmt0(totT)}</div><div style="width:64px"></div></div>`;
+    <div class="bud-nums">${fmt0(totS)} / ${fmt0(totT)}</div></div>`;
 }
 function spendModal(id){
   const c=S.budget.find(x=>x.id===id);
@@ -1407,6 +1453,8 @@ async function bankSync(manual){
   try{
     const now=Math.floor(Date.now()/1000);
     let start=b.lastSync?Math.floor(b.lastSync/1000)-7*86400:now-30*86400;
+    // One-time backfill of the fos_txns table: the API's full 89-day window (2026-11-21).
+    if(!b.txnsBackfill)start=now-89*86400;
     if(now-start>89*86400)start=now-89*86400;
     // pending=1: include transactions the bank has not posted yet, so today's swipes show up the same day.
     const res=await fetch(c.base+'/accounts?start-date='+start+'&pending=1',{headers:{Authorization:'Basic '+c.auth}});
@@ -1440,10 +1488,20 @@ async function bankSync(manual){
     // 5 days), one fingerprint per row, so two identical swipes in a day each need their own.
     b.inbox=b.inbox.filter(t=>!t.pending);
     const fpIdx=(acctId,amt,posted)=>b.done.findIndex(f=>f.acctId===acctId&&Math.abs(f.amount-amt)<0.005&&Math.abs((f.posted||0)-(posted||0))<=5*86400);
+    // fos_txns rows for this sync: new posted rows carry the category rule (if any), rows seen before
+    // are upserted without `cat` so a category already set is never overwritten, pending rows are a
+    // snapshot (wiped and re-added by txnsPush).
+    const txNew=[], txOld=[], txPend=[], rules=S.txnRules||{};
+    const txRow=(a,t,row)=>({user_id:sbUser?sbUser.id:'',acct_id:'sf:'+a.id,acct_name:String(a.name||'').slice(0,80),
+      inst:String((a.org&&(a.org.name||a.org.domain))||'').slice(0,80),posted:row.posted||now,amount:Math.round(row.amount*100)/100,
+      descr:String(row.desc||'').slice(0,200),payee:payeeKey(row.desc),pending:row.pending,source:'simplefin'});
     (data.accounts||[]).forEach(a=>(a.transactions||[]).forEach(t=>{
       const row={acct:a.name,acctId:a.id,posted:t.posted,amount:parseFloat(t.amount),desc:t.payee||t.description||t.memo||'',pending:!!t.pending};
-      if(row.pending){ b.inbox.push(row); return; }
+      if(isNaN(row.amount))return;
+      if(row.pending){ b.inbox.push(row); txPend.push(Object.assign(txRow(a,t,row),{key:'p:'+a.id+'|'+t.id})); return; }
       const key=a.id+'|'+t.id;
+      if(b.seen[key])txOld.push(Object.assign(txRow(a,t,row),{key:'sf:'+key}));
+      else{ const r=txRow(a,t,row); txNew.push(Object.assign(r,{key:'sf:'+key,cat:rules[r.payee]||null})); }
       // Deposit ledger (independent of the review inbox): posted inflows, so income collected
       // through Spark can be summed from the bank feed. Kept 70 days.
       if(row.amount>0&&!b.inflows[key])b.inflows[key]={posted:row.posted,amount:row.amount,desc:row.desc,acctId:a.id};
@@ -1462,13 +1520,117 @@ async function bankSync(manual){
     if(b.inbox.length>300)b.inbox.length=300;
     b.lastSync=Date.now();
     save(); renderBanks(); renderHome();
+    let txErr=false;
+    try{ await txnsPush(txNew,txOld,txPend,now); if(!b.txnsBackfill){ b.txnsBackfill=Date.now(); save(); } }
+    catch(e){ txErr=true; }
+    if($('p-txns').classList.contains('active'))loadTxns(true);
+    if($('p-budget').classList.contains('active'))budgetLoad();
     if(manual&&b.lastErrors.length)toast(b.lastErrors[0].slice(0,120));
-    else if(manual)toast(added?added+' new transaction'+(added===1?'':'s')+'.':'Up to date.');
+    else if(manual&&txErr)toast('Synced, but the transaction table did not update.');
+    else if(manual)toast(txNew.length?txNew.length+' new transaction'+(txNew.length===1?'':'s')+'.':'Up to date.');
   }catch(e){ if(manual)toast('Sync failed. Check the connection and try again.'); }
   finally{ syncBtns(false); }
 }
+// ── TRANSACTIONS (fos_txns table, one row per bank transaction, kept two years) ──────────
+// Race, 2026-11-21: "see every transaction and categorize it", budget from the latest year.
+// payee = normalized merchant key: lowercase, bank boilerplate and numbers stripped, first three
+// words. Category rules (S.txnRules[payee] = cat) auto-categorize new rows with the same payee.
+function payeeKey(d){
+  let s=String(d||'').toLowerCase();
+  s=s.replace(/\b(pos|debit card purchase|debit purchase|checkcard|check card|purchase|recurring|payment|online|ach|web|visa|mastercard|dda|pmt|des|id|indn|co id|ppd|ccd|tst|sq|pp)\b/g,' ');
+  s=s.replace(/\d[\d\-\/:#*.]*/g,' ');
+  s=s.replace(/[^a-z& ]+/g,' ').replace(/\s+/g,' ').trim();
+  return s.split(' ').slice(0,3).join(' ');
+}
+function monthRange(ym){ const[y,m]=ym.split('-').map(Number); return [Math.floor(new Date(y,m-1,1).getTime()/1000),Math.floor(new Date(y,m,1).getTime()/1000)]; }
+async function txnsPush(txNew,txOld,txPend,now){
+  if(!sbUser)return;
+  const put=async rows=>{ for(let i=0;i<rows.length;i+=300){ const {error}=await sb.from('fos_txns').upsert(rows.slice(i,i+300),{onConflict:'user_id,key'}); if(error)throw error; } };
+  const del=await sb.from('fos_txns').delete().eq('user_id',sbUser.id).eq('pending',true); if(del.error)throw del.error;
+  await put(txNew); await put(txOld); await put(txPend);
+  await sb.from('fos_txns').delete().eq('user_id',sbUser.id).lt('posted',now-730*86400);
+  TX.loaded=''; TXB.month='';
+}
+const TX={month:curMonthStr(),mode:'todo',acct:'',q:'',rows:[],loading:false,loaded:''};
+function txMonth(dir){ const[y,m]=TX.month.split('-').map(Number); const d=new Date(y,m-1+dir,1); TX.month=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); loadTxns(false); }
+function txMode(v){ TX.mode=v; renderTxns(); }
+function txAcct(v){ TX.acct=v; renderTxns(); }
+function txSearch(v){ TX.q=v; renderTxns(); }
+async function loadTxns(force){
+  if(!sbUser)return;
+  if(!force&&TX.loaded===TX.month){ renderTxns(); return; }
+  TX.loading=true; renderTxns();
+  const[a,z]=monthRange(TX.month);
+  const {data,error}=await sb.from('fos_txns').select('key,acct_id,acct_name,inst,posted,amount,descr,payee,pending,cat,source')
+    .eq('user_id',sbUser.id).gte('posted',a).lt('posted',z).order('posted',{ascending:false}).limit(3000);
+  TX.loading=false;
+  if(error){ TX.rows=[]; toast('Could not load transactions.'); }
+  else{ TX.rows=(data||[]).map(r=>Object.assign(r,{amount:+r.amount||0})); TX.loaded=TX.month; }
+  renderTxns();
+}
+function catOptions(){
+  const o=[];
+  (S.budget||[]).forEach(c=>o.push(['b:'+c.id,c.name,'Budget']));
+  ['school','home'].forEach(g=>((S.bills&&S.bills[g])||[]).forEach(b=>o.push(['e:'+g+':'+b.id,b.name,g==='school'?'Taekwondo':'Home'])));
+  o.push(['income','Income','Other'],['transfer','Transfer','Other'],['skip','Skip','Other']);
+  return o;
+}
+function catLabel(cat){ if(!cat)return 'Categorize'; const o=catOptions().find(x=>x[0]===cat); return o?o[1]:cat; }
+const txAmt=n=>(n<0?'-':'')+fmt(Math.abs(n));
+function txAcctName(r){ const a=acctRec().find(x=>x.id===r.acct_id); return a?(a.nick||a.name):(r.acct_name||''); }
+function renderTxns(){
+  if(!$('tx-list'))return;
+  const[y,m]=TX.month.split('-').map(Number);
+  $('tx-month').textContent=MNAMES[m-1]+' '+y;
+  document.querySelectorAll('#tx-mode span').forEach(el=>el.classList.toggle('on',el.dataset.v===TX.mode));
+  const sel=$('tx-acct'), accts=[...new Map(TX.rows.map(r=>[r.acct_id,txAcctName(r)])).entries()].sort((p,q)=>p[1].localeCompare(q[1]));
+  sel.innerHTML='<option value="">All accounts</option>'+accts.map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('');
+  sel.value=accts.some(x=>x[0]===TX.acct)?TX.acct:'';
+  const q=TX.q.trim().toLowerCase();
+  const rows=TX.rows.filter(r=>(TX.mode==='all'||!r.cat)&&(!TX.acct||r.acct_id===TX.acct)&&(!q||(r.descr||'').toLowerCase().includes(q)));
+  const todo=TX.rows.filter(r=>!r.cat).length;
+  const out=TX.rows.filter(r=>r.amount<0&&r.cat!=='transfer'&&r.cat!=='skip').reduce((s,r)=>s-r.amount,0);
+  $('tx-sub').textContent=TX.loading?'Loading…':(TX.rows.length?`${TX.rows.length} transactions · ${todo} to categorize · ${fmt0(out)} out`:'');
+  $('tx-list').innerHTML=rows.length?rows.map(r=>{
+    const i=TX.rows.indexOf(r), d=new Date(r.posted*1000);
+    const cls=r.cat?(r.cat==='transfer'||r.cat==='skip'?'quiet':'on'):'todo';
+    return `<div class="tx">
+      <div class="d">${d.getMonth()+1}/${d.getDate()}</div>
+      <div><div class="n">${esc(r.descr)||'(no description)'}</div><div class="s">${esc(txAcctName(r))}${r.pending?' · <span class="t-pending">pending</span>':''}</div></div>
+      <button class="cat ${cls}" onclick="catPick(${i})">${esc(catLabel(r.cat))}</button>
+      <div class="a ${r.amount>0?'in':''}">${txAmt(r.amount)}</div>
+    </div>`;
+  }).join(''):`<div class="empty">${TX.loading?'Loading…':(TX.rows.length?(TX.mode==='todo'?'Everything is categorized.':'Nothing matches.'):'No transactions this month. Tap Sync.')}</div>`;
+}
+function catPick(i){
+  const t=TX.rows[i]; if(!t)return;
+  const groups={}; catOptions().forEach(o=>{ (groups[o[2]]=groups[o[2]]||[]).push(o); });
+  openModal(`<h3>${esc(t.descr)||'(no description)'}</h3>
+    <div class="note-line" style="margin:0 0 6px">${txAmt(t.amount)} · ${esc(txAcctName(t))} · ${new Date(t.posted*1000).toLocaleDateString()}</div>
+    ${t.payee?`<label class="chk-line"><input type="checkbox" id="m-cat-all" checked> Apply to every "${esc(t.payee)}" transaction</label>`:''}
+    ${Object.keys(groups).map(g=>`<div class="cat-grp">${g}</div><div class="cat-opts">${groups[g].map(o=>`<button class="cat ${t.cat===o[0]?'on':''}" onclick="catSet(${i},'${o[0]}')">${esc(o[1])}</button>`).join('')}</div>`).join('')}
+    <div class="row" style="margin-top:12px"><button onclick="closeModal()">Cancel</button>${t.cat?`<button onclick="catSet(${i},null)">Clear</button>`:''}</div>`);
+}
+async function catSet(i,cat){
+  const t=TX.rows[i]; if(!t)return;
+  const all=!!(t.payee&&$('m-cat-all')&&$('m-cat-all').checked);
+  closeModal();
+  const stamp=new Date().toISOString();
+  t.cat=cat;
+  if(all){
+    TX.rows.forEach(r=>{ if(r.payee===t.payee&&!r.cat)r.cat=cat; });
+    if(!S.txnRules)S.txnRules={};
+    if(cat)S.txnRules[t.payee]=cat; else delete S.txnRules[t.payee];
+    save();
+  }
+  TXB.month=''; renderTxns();
+  try{
+    const r1=await sb.from('fos_txns').update({cat,updated_at:stamp}).eq('user_id',sbUser.id).eq('key',t.key); if(r1.error)throw r1.error;
+    if(all&&cat){ const r2=await sb.from('fos_txns').update({cat,updated_at:stamp}).eq('user_id',sbUser.id).eq('payee',t.payee).is('cat',null); if(r2.error)throw r2.error; }
+  }catch(e){ toast('Could not save that category. Try again.'); }
+}
 function syncBtns(busy){
-  ['bank-sync-btn','home-sync-btn'].forEach(id=>{ const el=$(id); if(el){ el.disabled=busy; el.textContent=busy?'Syncing…':'Sync'; } });
+  ['bank-sync-btn','home-sync-btn','tx-sync-btn'].forEach(id=>{ const el=$(id); if(el){ el.disabled=busy; el.textContent=busy?'Syncing…':'Sync'; } });
 }
 function renderBanks(){
   const b=bankRec();
@@ -1487,18 +1649,8 @@ function renderBanks(){
       : '<div class="empty">No accounts yet — hit Sync.</div>')+
       `<div class="note-line" style="margin-top:6px">Last sync: ${b.lastSync?new Date(b.lastSync).toLocaleString():'never'} · <span class="link-num" onclick="bankDisconnect()">Disconnect</span></div>`;
   }
-  $('bank-inbox').innerHTML=b.inbox.length?b.inbox.map((t,i)=>{
-    const d=t.posted?new Date(t.posted*1000):null;
-    return `<div class="alloc">
-      <span class="amt" style="color:${t.amount<0?'var(--belt)':'var(--money)'}">${fmt(t.amount)}</span>
-      <div class="what"><div>${esc(t.desc)||'(no description)'}${t.pending?' <span class="t-pending">pending</span>':''}</div>
-        <div class="d">${d?d.toLocaleDateString():''} · ${esc(t.acct)}</div></div>
-      <button class="small-btn" onclick="txnSpend(${i})">Spend</button>
-      <button class="small-btn" onclick="txnBill(${i})">Bill</button>
-      ${t.amount>0?`<button class="small-btn green" onclick="txnIncome(${i})">Income</button>`:''}
-      <button class="del" onclick="txnDismiss(${i})">×</button>
-    </div>`;
-  }).join(''):'<div class="empty">Nothing to review.</div>';
+  // The review inbox UI was retired 2026-11-21; S.bank.inbox is still filled by bankSync (it feeds
+  // S.bank.inflows seeding) but the Transactions tab now reads the fos_txns table (renderTxns).
 }
 function bankConnect(){
   openModal(`<h3>Connect SimpleFIN</h3>
