@@ -276,12 +276,15 @@ tr:hover td{background:var(--hover);}
 .bud-tile{display:flex; align-items:center; gap:10px; padding:10px; border-radius:12px; background:var(--box); border:1px solid var(--rule); min-width:0;}
 .bud-tile .nm{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .bud-tile .left{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
-.bud-tile .left.over{color:var(--belt);}
+.bud-tile .left.warn, .bud-hero .big.warn, .grp-tot.warn{color:var(--amber);}
+.bud-tile .left.over, .bud-hero .big.over, .grp-tot.over{color:var(--belt);}
+.grp-tot.ok{color:var(--money);}
 .bud-tile .of{font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;}
 .bud-tile > div{min-width:0;}
 .ring{flex:none; transform:rotate(-90deg);}
 .ring .bg{fill:none; stroke:var(--soft);}
 .ring .fg{fill:none; stroke:var(--money); stroke-linecap:round; transition:stroke-dashoffset .4s;}
+.ring.warn .fg{stroke:var(--amber);}
 .ring.over .fg{stroke:var(--belt);}
 .ring.none .fg{stroke:var(--faint);}
 
@@ -1391,12 +1394,18 @@ async function budgetLoad(){
   TXB.month=budM; TXB.sums=sums; renderBudget();
 }
 // Ring: the share LEFT, drawn green; spent eats it clockwise. Over target = full red ring. No target = faint full ring.
+// State (Race, 2026-11-24): green while more than half is left, amber in the last half, red in the last quarter or over.
+function budState(spent,tgt){
+  if(!(tgt>0))return 'none';
+  const left=(tgt-spent)/tgt;
+  return spent>tgt||left<0.25?'over':left<=0.5?'warn':'ok';
+}
 function ringSVG(spent,tgt,size,width){
-  const r=(size-width)/2, c=2*Math.PI*r;
-  const over=tgt>0&&spent>tgt, none=!(tgt>0);
+  const r=(size-width)/2, c=2*Math.PI*r, st=budState(spent,tgt);
+  const over=tgt>0&&spent>tgt, none=st==='none';
   const left=none?1:Math.max(0,Math.min(1,(tgt-spent)/tgt));
   const frac=over?1:left;
-  return `<svg class="ring ${over?'over':''} ${none?'none':''}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  return `<svg class="ring ${st}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <circle class="bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${width}"/>
     <circle class="fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${width}" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c*(1-frac)).toFixed(2)}"/>
   </svg>`;
@@ -1408,22 +1417,22 @@ function renderBudget(){
   let allT=0, allS=0;
   const spentOf=c=>(sp[c.id]||[]).reduce((a,b)=>a+b,0)+(tx[String(c.id)]||0);
   const tile=c=>{
-    const spent=spentOf(c), left=c.tgt-spent, over=c.tgt>0&&spent>c.tgt;
+    const spent=spentOf(c), left=c.tgt-spent, over=c.tgt>0&&spent>c.tgt, st=budState(spent,c.tgt);
     const main=c.tgt>0?(over?fmt0(spent-c.tgt)+' over':fmt0(left)+' left'):fmt0(spent)+' spent';
     const of=c.tgt>0?fmt0(spent)+' of '+fmt0(c.tgt):'no target';
-    return `<div class="bud-tile">${ringSVG(spent,c.tgt,48,7)}<div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="left ${over?'over':''}">${main}</div><div class="of">${of}</div></div></div>`;
+    return `<div class="bud-tile">${ringSVG(spent,c.tgt,48,7)}<div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="left ${st}">${main}</div><div class="of">${of}</div></div></div>`;
   };
   // Home first, then Taekwondo: one card per side with its own ring, then a ring tile per category.
   $('bud-rows').innerHTML=EXP_GROUPS.slice().reverse().map(([grp,title])=>{
     const cats=budgetCats(grp); if(!cats.length)return '';
     const gen=tx['g:'+grp]||0; // sorted to this side by the card only, no finer category
     const list=cats.concat(gen?[{id:'g:'+grp,name:'General',tgt:0}]:[]);
-    const tgt=cats.reduce((s,c)=>s+(+c.tgt||0),0), spent=list.reduce((s,c)=>s+spentOf(c),0), over=spent>tgt;
+    const tgt=cats.reduce((s,c)=>s+(+c.tgt||0),0), spent=list.reduce((s,c)=>s+spentOf(c),0), over=spent>tgt, st=budState(spent,tgt);
     allT+=tgt; allS+=spent;
     return `<div class="card ${grp==='home'?'ac-green':'ac-red'}">
-      <div class="card-h"><span class="ttl"><span class="icb ac">${ico(grp==='home'?'home':'target')}</span>${title}</span><span class="grp-tot" style="color:${over?'var(--belt)':'var(--money)'}">${over?fmt0(spent-tgt)+' over':fmt0(tgt-spent)+' left'}</span></div>
+      <div class="card-h"><span class="ttl"><span class="icb ac">${ico(grp==='home'?'home':'target')}</span>${title}</span><span class="grp-tot ${st}">${over?fmt0(spent-tgt)+' over':fmt0(tgt-spent)+' left'}</span></div>
       <div class="card-b">
-        <div class="bud-hero">${ringSVG(spent,tgt,84,11)}<div><div class="big" style="color:${over?'var(--belt)':'var(--ink)'}">${fmt0(spent)} spent</div><div class="sub">of ${fmt0(tgt)} this month${over?'':' · '+fmt0(tgt-spent)+' to go'}</div></div></div>
+        <div class="bud-hero">${ringSVG(spent,tgt,84,11)}<div><div class="big ${st}">${fmt0(spent)} spent</div><div class="sub">of ${fmt0(tgt)} this month${over?'':' · '+fmt0(tgt-spent)+' to go'}</div></div></div>
         <div class="bud-grid">${list.map(tile).join('')}</div>
       </div></div>`;
   }).join('')||'<div class="card"><div class="card-b"><div class="empty">No budget categories yet.</div></div></div>';
