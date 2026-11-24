@@ -286,6 +286,10 @@ tr:hover td{background:var(--hover);}
 .ring .fg{fill:none; stroke:var(--money); stroke-linecap:round; transition:stroke-dashoffset .4s;}
 .ring.warn .fg{stroke:var(--amber);}
 .ring.over .fg{stroke:var(--belt);}
+.ring .fd{fill:none; stroke:var(--blue); stroke-linecap:round;}
+.bud-tile.tap{cursor:pointer;}
+.bud-tile.tap:hover{background:var(--hover);}
+.unf{color:var(--belt); font-weight:700;}
 .ring.none .fg{stroke:var(--faint);}
 
 /* MODAL */
@@ -807,6 +811,7 @@ function defaults(){return {
   income:{lastSync:0,data:null,err:''},
   budgetBucket:0,
   budgetBucketSchool:0,
+  budgetFund:{},
   homeView:'flow',
   bankOrder:[],
   txnRules:{},
@@ -1204,7 +1209,8 @@ function expRowHTML(grp,b){
 const budGrp=c=>c.grp==='school'?'school':'home';
 const budgetCats=grp=>(S.budget||[]).filter(c=>budGrp(c)===grp);
 const budgetTotal=grp=>budgetCats(grp).reduce((s,c)=>s+(+c.tgt||0),0);
-const budBucket=grp=>grp==='school'?(+S.budgetBucketSchool||0):(+S.budgetBucket||0);
+// The side's spending bucket = what has been funded this month across its categories (S.budgetFund).
+const budBucket=grp=>budgetCats(grp).reduce((s,c)=>s+fundedOf(c,ymNow()),0);
 function budgetRowHTML(grp){
   const amt=budgetTotal(grp), inB=budBucket(grp), pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
   return `<div class="exp" title="Average">
@@ -1400,15 +1406,40 @@ function budState(spent,tgt){
   const left=(tgt-spent)/tgt;
   return spent>tgt||left<0.25?'over':left<=0.5?'warn':'ok';
 }
-function ringSVG(spent,tgt,size,width){
+// Two rings (Race, 2026-11-24): the OUTER ring is what is left of the target (green / amber / red by
+// budState), the INNER ring is how much of the target has actually been funded this month (blue).
+// Spending is allowed before funding; the tile then says so in red, because the money has to be there.
+function ringSVG(spent,tgt,size,width,funded){
   const r=(size-width)/2, c=2*Math.PI*r, st=budState(spent,tgt);
   const over=tgt>0&&spent>tgt, none=st==='none';
   const left=none?1:Math.max(0,Math.min(1,(tgt-spent)/tgt));
   const frac=over?1:left;
+  const r2=r-width-2, c2=2*Math.PI*r2, ff=tgt>0?Math.max(0,Math.min(1,(+funded||0)/tgt)):0;
   return `<svg class="ring ${st}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <circle class="bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${width}"/>
     <circle class="fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${width}" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c*(1-frac)).toFixed(2)}"/>
+    ${funded===undefined?'':`<circle class="bg" cx="${size/2}" cy="${size/2}" r="${r2}" stroke-width="${width-2}"/>
+    <circle class="fd" cx="${size/2}" cy="${size/2}" r="${r2}" stroke-width="${width-2}" stroke-dasharray="${c2.toFixed(2)}" stroke-dashoffset="${(c2*(1-ff)).toFixed(2)}"/>`}
   </svg>`;
+}
+// Funded = money Race says he moved into a category this month: S.budgetFund[ym][catId] (number).
+const fundedOf=(c,ym)=>+(((S.budgetFund||{})[ym]||{})[c.id])||0;
+function budFundModal(id){
+  const c=(S.budget||[]).find(x=>String(x.id)===String(id)); if(!c)return;
+  const f=fundedOf(c,budM), tgt=+c.tgt||0, [y,m]=budM.split('-').map(Number);
+  openModal(`<h3>${esc(c.name)}</h3>
+    <div class="note-line" style="margin:0 0 8px">${MNAMES[m-1]} ${y} · funded ${fmt0(f)} of ${fmt0(tgt)}</div>
+    <div class="field"><label>Add to this month's funding</label><input type="number" id="m-fund" step="0.01" placeholder="0.00" onkeydown="if(event.key==='Enter')budFundGo('${c.id}')"></div>
+    <div class="row"><button onclick="closeModal()">Cancel</button>${tgt>f?`<button onclick="$('m-fund').value=${(tgt-f).toFixed(2)};budFundGo('${c.id}')">Fund to ${fmt0(tgt)}</button>`:''}<button class="go" onclick="budFundGo('${c.id}')">Add</button></div>
+    ${f>0?`<div class="row" style="margin-top:6px"><button onclick="$('m-fund').value=${(-f).toFixed(2)};budFundGo('${c.id}')">Take it all back out</button></div>`:''}`);
+  setTimeout(()=>$('m-fund').focus(),50);
+}
+function budFundGo(id){
+  const v=parseFloat($('m-fund').value); if(isNaN(v)||v===0)return;
+  if(!S.budgetFund)S.budgetFund={}; if(!S.budgetFund[budM])S.budgetFund[budM]={};
+  S.budgetFund[budM][id]=Math.round(((+S.budgetFund[budM][id]||0)+v)*100)/100;
+  if(S.budgetFund[budM][id]<=0)delete S.budgetFund[budM][id];
+  save(); closeModal(); renderBudget(); renderBills(); toast('Funding updated.');
 }
 function renderBudget(){
   const[y,m]=budM.split('-').map(Number);
@@ -1417,26 +1448,28 @@ function renderBudget(){
   let allT=0, allS=0;
   const spentOf=c=>(sp[c.id]||[]).reduce((a,b)=>a+b,0)+(tx[String(c.id)]||0);
   const tile=c=>{
-    const spent=spentOf(c), left=c.tgt-spent, over=c.tgt>0&&spent>c.tgt, st=budState(spent,c.tgt);
-    const main=c.tgt>0?(over?fmt0(spent-c.tgt)+' over':fmt0(left)+' left'):fmt0(spent)+' spent';
-    const of=c.tgt>0?fmt0(spent)+' of '+fmt0(c.tgt):'no target';
-    return `<div class="bud-tile">${ringSVG(spent,c.tgt,48,7)}<div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="left ${st}">${main}</div><div class="of">${of}</div></div></div>`;
+    const spent=spentOf(c), left=c.tgt-spent, over=c.tgt>0&&spent>c.tgt, st=budState(spent,c.tgt), real=c.tgt>0;
+    const fd=real?fundedOf(c,budM):0, unf=Math.max(0,spent-fd);
+    const main=real?(over?fmt0(spent-c.tgt)+' over':fmt0(left)+' left'):fmt0(spent)+' spent';
+    const lines=real?`<div class="of">Funded ${fmt0(fd)} of ${fmt0(c.tgt)}</div><div class="of">Spent ${fmt0(spent)}${unf>0.5?` · <span class="unf">${fmt0(unf)} before funding</span>`:''}</div>`:'<div class="of">no target</div>';
+    return `<div class="bud-tile ${real?'tap':''}" ${real?`onclick="budFundModal('${c.id}')"`:''}>${real?ringSVG(spent,c.tgt,52,7,fd):ringSVG(spent,0,52,7)}<div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="left ${st}">${main}</div>${lines}</div></div>`;
   };
-  // Home first, then Taekwondo: one card per side with its own ring, then a ring tile per category.
+  // Home first, then Taekwondo: one card per side with its own rings, then a two-ring tile per category.
   $('bud-rows').innerHTML=EXP_GROUPS.slice().reverse().map(([grp,title])=>{
     const cats=budgetCats(grp); if(!cats.length)return '';
     const gen=tx['g:'+grp]||0; // sorted to this side by the card only, no finer category
     const list=cats.concat(gen?[{id:'g:'+grp,name:'General',tgt:0}]:[]);
     const tgt=cats.reduce((s,c)=>s+(+c.tgt||0),0), spent=list.reduce((s,c)=>s+spentOf(c),0), over=spent>tgt, st=budState(spent,tgt);
+    const fd=cats.reduce((s,c)=>s+fundedOf(c,budM),0), unf=Math.max(0,spent-fd);
     allT+=tgt; allS+=spent;
     return `<div class="card ${grp==='home'?'ac-green':'ac-red'}">
       <div class="card-h"><span class="ttl"><span class="icb ac">${ico(grp==='home'?'home':'target')}</span>${title}</span><span class="grp-tot ${st}">${over?fmt0(spent-tgt)+' over':fmt0(tgt-spent)+' left'}</span></div>
       <div class="card-b">
-        <div class="bud-hero">${ringSVG(spent,tgt,84,11)}<div><div class="big ${st}">${fmt0(spent)} spent</div><div class="sub">of ${fmt0(tgt)} this month${over?'':' · '+fmt0(tgt-spent)+' to go'}</div></div></div>
+        <div class="bud-hero">${ringSVG(spent,tgt,92,11,fd)}<div><div class="big ${st}">${fmt0(spent)} spent</div><div class="sub">of ${fmt0(tgt)} this month${over?'':' · '+fmt0(tgt-spent)+' to go'}</div><div class="sub">Funded ${fmt0(fd)} of ${fmt0(tgt)}${unf>0.5?` · <span class="unf">${fmt0(unf)} spent before funding</span>`:''}</div></div></div>
         <div class="bud-grid">${list.map(tile).join('')}</div>
       </div></div>`;
   }).join('')||'<div class="card"><div class="card-b"><div class="empty">No budget categories yet.</div></div></div>';
-  $('bud-sub').textContent=`${fmt0(allS)} spent of ${fmt0(allT)} · variable spending, from the Transactions tab`;
+  $('bud-sub').textContent=`${fmt0(allS)} spent of ${fmt0(allT)} · outer ring: left · inner ring: funded · tap a tile to fund it`;
 }
 function spendModal(id){
   const c=S.budget.find(x=>x.id===id);
