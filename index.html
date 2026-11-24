@@ -245,6 +245,7 @@ tr:hover td{background:var(--hover);}
 .tx .a.in{color:var(--money);}
 .cat{font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; border:1px solid var(--rule); background:var(--field); color:var(--ink); cursor:pointer; font-family:inherit; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis;}
 .cat.todo{border-color:var(--amber); color:var(--amber); background:var(--amber-tint);}
+.cat.sug{border-style:dashed; border-color:var(--amber); color:var(--ink2); background:transparent;}
 .cat.on{border-color:var(--money); color:var(--money); background:var(--money-tint);}
 .cat.quiet{color:var(--muted);}
 .cat-grp{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:10px 0 4px;}
@@ -644,6 +645,7 @@ tr:hover td{background:var(--hover);}
     <div class="seg" id="tx-mode"><span data-v="todo" onclick="txMode('todo')">To do</span><span data-v="all" onclick="txMode('all')">All</span></div>
     <select id="tx-acct" onchange="txAcct(this.value)"><option value="">All accounts</option></select>
     <input id="tx-q" placeholder="Search" oninput="txSearch(this.value)">
+    <button class="small-btn" id="tx-confirm-btn" onclick="txConfirmAll()" style="display:none">Confirm all suggested</button>
   </div>
   <div class="card ac-green"><div class="card-b" id="tx-list" style="padding:0 14px"></div></div>
 </div></div>
@@ -1371,9 +1373,10 @@ const TXB={month:'',sums:{}};
 async function budgetLoad(){
   if(!sbUser||TXB.month===budM){ renderBudget(); return; }
   const[a,z]=monthRange(budM);
-  const {data,error}=await sb.from('fos_txns').select('cat,amount').eq('user_id',sbUser.id).gte('posted',a).lt('posted',z).like('cat','b:%').limit(5000);
+  const {data,error}=await sb.from('fos_txns').select('cat,amount').eq('user_id',sbUser.id).gte('posted',a).lt('posted',z).or('cat.like.b:%,cat.like.g:%').limit(5000);
   if(error){ renderBudget(); return; }
-  const sums={}; (data||[]).forEach(r=>{ if(!r.cat||!String(r.cat).startsWith('b:'))return; const id=r.cat.slice(2); sums[id]=(sums[id]||0)-(+r.amount||0); });
+  // sums keyed by budget id ('71') or by the coarse side category itself ('g:home', 'g:school')
+  const sums={}; (data||[]).forEach(r=>{ const c=String(r.cat||''); if(!c.startsWith('b:')&&!c.startsWith('g:'))return; const id=c.startsWith('b:')?c.slice(2):c; sums[id]=(sums[id]||0)-(+r.amount||0); });
   TXB.month=budM; TXB.sums=sums; renderBudget();
 }
 function renderBudget(){
@@ -1395,7 +1398,9 @@ function renderBudget(){
   // Home first, then Taekwondo, each under its own small header (categories carry grp).
   $('bud-rows').innerHTML=EXP_GROUPS.slice().reverse().map(([grp,title])=>{
     const cats=budgetCats(grp); if(!cats.length)return '';
-    return `<div class="cat-grp">${title}</div>`+cats.map(row).join('');
+    // "Unsorted" = confirmed to this side by the card it was swiped on, no finer category yet.
+    const uns=tx['g:'+grp]||0, unsRow=uns?row({id:'g:'+grp,name:title+', unsorted',tgt:0,note:'sorted by card only'}):'';
+    return `<div class="cat-grp">${title}</div>`+cats.map(row).join('')+unsRow;
   }).join('')+`<div class="bud-row" style="border-top:2px solid var(--rule);font-weight:700">
     <div class="bud-name">Total</div><div class="bud-bar"></div>
     <div class="bud-nums">${fmt0(totS)} / ${fmt0(totT)}</div></div>`;
@@ -1504,7 +1509,7 @@ async function bankSync(manual){
     // fos_txns rows for this sync: new posted rows carry the category rule (if any), rows seen before
     // are upserted without `cat` so a category already set is never overwritten, pending rows are a
     // snapshot (wiped and re-added by txnsPush).
-    const txNew=[], txOld=[], txPend=[], rules=S.txnRules||{};
+    const txNew=[], txOld=[], txPend=[];
     const txRow=(a,t,row)=>({user_id:sbUser?sbUser.id:'',acct_id:'sf:'+a.id,acct_name:String(a.name||'').slice(0,80),
       inst:String((a.org&&(a.org.name||a.org.domain))||'').slice(0,80),posted:row.posted||now,amount:Math.round(row.amount*100)/100,
       descr:String(row.desc||'').slice(0,200),payee:payeeKey(row.desc),pending:row.pending,source:'simplefin'});
@@ -1514,7 +1519,7 @@ async function bankSync(manual){
       if(row.pending){ b.inbox.push(row); txPend.push(Object.assign(txRow(a,t,row),{key:'p:'+a.id+'|'+t.id})); return; }
       const key=a.id+'|'+t.id;
       if(b.seen[key])txOld.push(Object.assign(txRow(a,t,row),{key:'sf:'+key}));
-      else{ const r=txRow(a,t,row); txNew.push(Object.assign(r,{key:'sf:'+key,cat:rules[r.payee]||null})); }
+      else{ const r=txRow(a,t,row); txNew.push(Object.assign(r,{key:'sf:'+key,cat:null})); } // never pre-set: rules and the card's side only suggest, Race confirms (2026-11-24)
       // Deposit ledger (independent of the review inbox): posted inflows, so income collected
       // through Spark can be summed from the bank feed. Kept 70 days.
       if(row.amount>0&&!b.inflows[key])b.inflows[key]={posted:row.posted,amount:row.amount,desc:row.desc,acctId:a.id};
@@ -1546,8 +1551,20 @@ async function bankSync(manual){
 }
 // ── TRANSACTIONS (fos_txns table, one row per bank transaction, kept two years) ──────────
 // Race, 2026-11-21: "see every transaction and categorize it", budget from the latest year.
+// Race, 2026-11-24: sort by account, not merchant, and review everything. Each account carries a
+// side (accounts[].side = 'school' | 'home', home when unset); a new row is never categorized on
+// insert. Its chip shows a suggestion (txSuggest: the payee rule if one exists, else income for a
+// deposit, else the card's side as a coarse 'g:<side>' category) until Race taps it, or "Confirm all
+// suggested". 'g:school' / 'g:home' are real categories ("Taekwondo, unsorted" / "Home, unsorted")
+// that the Budget tab counts, so a swipe on the right card sorts itself with one tap.
 // payee = normalized merchant key: lowercase, bank boilerplate and numbers stripped, first three
-// words. Category rules (S.txnRules[payee] = cat) auto-categorize new rows with the same payee.
+// words. Category rules (S.txnRules[payee] = cat) only suggest; they never set a category.
+const acctSide=a=>a&&a.side==='school'?'school':'home';
+function txSuggest(r){
+  const rules=S.txnRules||{}; if(r.payee&&rules[r.payee])return rules[r.payee];
+  if(r.amount>0)return 'income';
+  return 'g:'+acctSide(acctRec().find(x=>x.id===r.acct_id));
+}
 function payeeKey(d){
   let s=String(d||'').toLowerCase();
   s=s.replace(/\b(pos|debit card purchase|debit purchase|checkcard|check card|purchase|recurring|payment|online|ach|web|visa|mastercard|dda|pmt|des|id|indn|co id|ppd|ccd|tst|sq|pp)\b/g,' ');
@@ -1560,8 +1577,17 @@ async function txnsPush(txNew,txOld,txPend,now){
   if(!sbUser)return;
   const put=async rows=>{ for(let i=0;i<rows.length;i+=300){ const {error}=await sb.from('fos_txns').upsert(rows.slice(i,i+300),{onConflict:'user_id,key'}); if(error)throw error; } };
   const del=await sb.from('fos_txns').delete().eq('user_id',sbUser.id).eq('pending',true); if(del.error)throw del.error;
+  // Rows imported from bank CSVs (key 'csv:...') cover the same days as the feed's first pull: a new
+  // feed row that matches an imported one (same account, same amount, within 2 days) is not added.
+  if(txNew.length){
+    const lo=Math.min(...txNew.map(r=>r.posted))-2*86400, hi=Math.max(...txNew.map(r=>r.posted))+2*86400;
+    const {data}=await sb.from('fos_txns').select('acct_id,posted,amount').eq('user_id',sbUser.id).eq('source','csv').gte('posted',lo).lte('posted',hi).limit(5000);
+    const csv=data||[];
+    for(let i=txNew.length-1;i>=0;i--){ const r=txNew[i]; const j=csv.findIndex(c=>c.acct_id===r.acct_id&&Math.abs((+c.amount)-r.amount)<0.005&&Math.abs(c.posted-r.posted)<=2*86400); if(j>=0){ csv.splice(j,1); txNew.splice(i,1); } }
+  }
   await put(txNew); await put(txOld); await put(txPend);
-  await sb.from('fos_txns').delete().eq('user_id',sbUser.id).lt('posted',now-730*86400);
+  // keep this year and the two before it in full (the CSV history starts Nov 2024)
+  await sb.from('fos_txns').delete().eq('user_id',sbUser.id).lt('posted',Math.floor(new Date(new Date().getFullYear()-2,0,1).getTime()/1000));
   TX.loaded=''; TXB.month='';
 }
 const TX={month:curMonthStr(),mode:'todo',acct:'',q:'',rows:[],loading:false,loaded:''};
@@ -1582,13 +1608,25 @@ async function loadTxns(force){
   renderTxns();
 }
 function catOptions(){
-  const o=[];
+  const o=[['g:school','Taekwondo, unsorted','Taekwondo budget'],['g:home','Home, unsorted','Home budget']];
   (S.budget||[]).forEach(c=>o.push(['b:'+c.id,c.name,budGrp(c)==='school'?'Taekwondo budget':'Home budget']));
-  ['school','home'].forEach(g=>((S.bills&&S.bills[g])||[]).forEach(b=>o.push(['e:'+g+':'+b.id,b.name,g==='school'?'Taekwondo':'Home'])));
+  ['school','home'].forEach(g=>((S.bills&&S.bills[g])||[]).forEach(b=>o.push(['e:'+g+':'+b.id,b.name,g==='school'?'Taekwondo bills':'Home bills'])));
   o.push(['income','Income','Other'],['transfer','Transfer','Other'],['skip','Skip','Other']);
   return o;
 }
 function catLabel(cat){ if(!cat)return 'Categorize'; const o=catOptions().find(x=>x[0]===cat); return o?o[1]:cat; }
+// Confirm every suggestion in the current To do view (this month, account filter and search applied).
+async function txConfirmAll(){
+  if(!sbUser)return;
+  const q=TX.q.trim().toLowerCase();
+  const rows=TX.rows.filter(r=>!r.cat&&(!TX.acct||r.acct_id===TX.acct)&&(!q||(r.descr||'').toLowerCase().includes(q)));
+  if(!rows.length)return;
+  const stamp=new Date().toISOString();
+  const up=rows.map(r=>{ r.cat=txSuggest(r); return Object.assign({},r,{user_id:sbUser.id,updated_at:stamp}); });
+  TXB.month=''; renderTxns();
+  try{ for(let i=0;i<up.length;i+=300){ const {error}=await sb.from('fos_txns').upsert(up.slice(i,i+300),{onConflict:'user_id,key'}); if(error)throw error; } toast(rows.length+' confirmed.'); }
+  catch(e){ toast('Could not save. Try again.'); }
+}
 const txAmt=n=>(n<0?'-':'')+fmt(Math.abs(n));
 function txAcctName(r){ const a=acctRec().find(x=>x.id===r.acct_id); return a?(a.nick||a.name):(r.acct_name||''); }
 function renderTxns(){
@@ -1603,35 +1641,39 @@ function renderTxns(){
   const rows=TX.rows.filter(r=>(TX.mode==='all'||!r.cat)&&(!TX.acct||r.acct_id===TX.acct)&&(!q||(r.descr||'').toLowerCase().includes(q)));
   const todo=TX.rows.filter(r=>!r.cat).length;
   const out=TX.rows.filter(r=>r.amount<0&&r.cat!=='transfer'&&r.cat!=='skip').reduce((s,r)=>s-r.amount,0);
-  $('tx-sub').textContent=TX.loading?'Loading…':(TX.rows.length?`${TX.rows.length} transactions · ${todo} to categorize · ${fmt0(out)} out`:'');
+  $('tx-sub').textContent=TX.loading?'Loading…':(TX.rows.length?`${TX.rows.length} transactions · ${todo} to review · ${fmt0(out)} out`:'');
+  const cb=$('tx-confirm-btn'); if(cb)cb.style.display=TX.mode==='todo'&&rows.some(r=>!r.cat)?'':'none';
   $('tx-list').innerHTML=rows.length?rows.map(r=>{
     const i=TX.rows.indexOf(r), d=new Date(r.posted*1000);
-    const cls=r.cat?(r.cat==='transfer'||r.cat==='skip'?'quiet':'on'):'todo';
+    const cls=r.cat?(r.cat==='transfer'||r.cat==='skip'?'quiet':'on'):'sug';
     return `<div class="tx">
       <div class="d">${d.getMonth()+1}/${d.getDate()}</div>
       <div><div class="n">${esc(r.descr)||'(no description)'}</div><div class="s">${esc(txAcctName(r))}${r.pending?' · <span class="t-pending">pending</span>':''}</div></div>
-      <button class="cat ${cls}" onclick="catPick(${i})">${esc(catLabel(r.cat))}</button>
+      <button class="cat ${cls}" onclick="catPick(${i})" title="${r.cat?'':'Suggested, tap to confirm or change'}">${esc(catLabel(r.cat||txSuggest(r)))}${r.cat?'':'?'}</button>
       <div class="a ${r.amount>0?'in':''}">${txAmt(r.amount)}</div>
     </div>`;
   }).join(''):`<div class="empty">${TX.loading?'Loading…':(TX.rows.length?(TX.mode==='todo'?'Everything is categorized.':'Nothing matches.'):'No transactions this month. Tap Sync.')}</div>`;
 }
 function catPick(i){
   const t=TX.rows[i]; if(!t)return;
+  const sug=t.cat||txSuggest(t), side=acctSide(acctRec().find(x=>x.id===t.acct_id));
   const groups={}; catOptions().forEach(o=>{ (groups[o[2]]=groups[o[2]]||[]).push(o); });
+  // The swiped card's side comes first, the other side below it, then Income / Transfer / Skip.
+  const order=side==='school'?['Taekwondo budget','Taekwondo bills','Home budget','Home bills','Other']:['Home budget','Home bills','Taekwondo budget','Taekwondo bills','Other'];
   openModal(`<h3>${esc(t.descr)||'(no description)'}</h3>
     <div class="note-line" style="margin:0 0 6px">${txAmt(t.amount)} · ${esc(txAcctName(t))} · ${new Date(t.posted*1000).toLocaleDateString()}</div>
-    ${t.payee?`<label class="chk-line"><input type="checkbox" id="m-cat-all" checked> Apply to every "${esc(t.payee)}" transaction</label>`:''}
-    ${Object.keys(groups).map(g=>`<div class="cat-grp">${g}</div><div class="cat-opts">${groups[g].map(o=>`<button class="cat ${t.cat===o[0]?'on':''}" onclick="catSet(${i},'${o[0]}')">${esc(o[1])}</button>`).join('')}</div>`).join('')}
+    ${t.cat?'':`<div class="row" style="margin:0 0 8px"><button class="go" onclick="catSet(${i},'${sug}')">Confirm: ${esc(catLabel(sug))}</button></div>`}
+    ${t.payee?`<label class="chk-line"><input type="checkbox" id="m-cat-all"> Suggest this for every "${esc(t.payee)}" from now on</label>`:''}
+    ${order.filter(g=>groups[g]).map(g=>`<div class="cat-grp">${g}</div><div class="cat-opts">${groups[g].map(o=>`<button class="cat ${t.cat===o[0]?'on':(!t.cat&&sug===o[0]?'sug':'')}" onclick="catSet(${i},'${o[0]}')">${esc(o[1])}</button>`).join('')}</div>`).join('')}
     <div class="row" style="margin-top:12px"><button onclick="closeModal()">Cancel</button>${t.cat?`<button onclick="catSet(${i},null)">Clear</button>`:''}</div>`);
 }
 async function catSet(i,cat){
   const t=TX.rows[i]; if(!t)return;
-  const all=!!(t.payee&&$('m-cat-all')&&$('m-cat-all').checked);
+  const rule=!!(t.payee&&$('m-cat-all')&&$('m-cat-all').checked);
   closeModal();
   const stamp=new Date().toISOString();
   t.cat=cat;
-  if(all){
-    TX.rows.forEach(r=>{ if(r.payee===t.payee&&!r.cat)r.cat=cat; });
+  if(rule){ // a rule only changes what other rows with this payee suggest; they still wait for a tap
     if(!S.txnRules)S.txnRules={};
     if(cat)S.txnRules[t.payee]=cat; else delete S.txnRules[t.payee];
     save();
@@ -1639,7 +1681,6 @@ async function catSet(i,cat){
   TXB.month=''; renderTxns();
   try{
     const r1=await sb.from('fos_txns').update({cat,updated_at:stamp}).eq('user_id',sbUser.id).eq('key',t.key); if(r1.error)throw r1.error;
-    if(all&&cat){ const r2=await sb.from('fos_txns').update({cat,updated_at:stamp}).eq('user_id',sbUser.id).eq('payee',t.payee).is('cat',null); if(r2.error)throw r2.error; }
   }catch(e){ toast('Could not save that category. Try again.'); }
 }
 function syncBtns(busy){
