@@ -267,14 +267,23 @@ tr:hover td{background:var(--hover);}
 .surplus-box .tgt{font-size:12px; color:#ddd;}
 
 /* BUDGET */
-.bud-row{display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--soft);}
-.bud-row:last-child{border-bottom:none;}
-.bud-name{width:150px; font-weight:600;}
-.bud-bar{flex:1; height:8px; background:var(--soft); border-radius:4px; overflow:hidden;}
-.bud-fill{height:8px; border-radius:4px; background:var(--money);}
-.bud-fill.over{background:var(--belt);}
-.bud-nums{width:150px; text-align:right; font-size:16px; font-weight:700; font-variant-numeric:tabular-nums;}
-.bud-nums .left{color:var(--muted); font-size:10px;}
+/* Budget tab (2026-11-24): one card per side, a big ring for the whole side and a ring tile per category.
+   The ring is what is LEFT (green), eaten clockwise by what was spent; red once over. */
+.bud-hero{display:flex; align-items:center; gap:16px; padding:4px 0 12px; border-bottom:1px solid var(--soft); margin-bottom:12px;}
+.bud-hero .big{font-size:26px; font-weight:800; line-height:1.1;}
+.bud-hero .sub{font-size:13px; color:var(--muted); margin-top:4px;}
+.bud-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px;}
+.bud-tile{display:flex; align-items:center; gap:10px; padding:10px; border-radius:12px; background:var(--box); border:1px solid var(--rule); min-width:0;}
+.bud-tile .nm{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.bud-tile .left{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15;}
+.bud-tile .left.over{color:var(--belt);}
+.bud-tile .of{font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums;}
+.bud-tile > div{min-width:0;}
+.ring{flex:none; transform:rotate(-90deg);}
+.ring .bg{fill:none; stroke:var(--soft);}
+.ring .fg{fill:none; stroke:var(--money); stroke-linecap:round; transition:stroke-dashoffset .4s;}
+.ring.over .fg{stroke:var(--belt);}
+.ring.none .fg{stroke:var(--faint);}
 
 /* MODAL */
 .overlay{position:fixed; inset:0; background:rgba(20,20,20,.45); display:none; align-items:center; justify-content:center; z-index:100; padding:16px;}
@@ -399,8 +408,9 @@ tr:hover td{background:var(--hover);}
 #auth-err{color:var(--belt); font-size:11px; margin-top:8px; min-height:14px;}
 #sync-dot{font-size:10px; font-weight:600; align-self:center;}
 @media(max-width:640px){
-  .bud-name{width:105px;}
-  .bud-nums{width:110px;}
+  .bud-grid{grid-template-columns:repeat(2,1fr); gap:8px;}
+  .bud-tile{padding:8px; gap:8px;}
+  .bud-tile .left{font-size:15px; white-space:nowrap;}
   .sum{flex-wrap:wrap;}
   .sum .big{font-size:30px;}
   .inc .cell .icb{display:none;}
@@ -586,13 +596,14 @@ tr:hover td{background:var(--hover);}
 
 <!-- BUDGET -->
 <div class="page" id="p-budget"><div class="wrap">
-  <div class="card">
-    <div class="card-h"><span>Spending vs target — <span id="bud-month"></span></span>
-      <span><button class="small-btn" onclick="budMonth(-1)">◀</button> <button class="small-btn" onclick="budMonth(1)">▶</button></span>
+  <div class="home-top">
+    <div><div class="home-q" id="bud-month">Budget</div><div class="home-sub" id="bud-sub"></div></div>
+    <div class="home-acts">
+      <button class="small-btn" onclick="budMonth(-1)" title="Previous month">&#9664;</button>
+      <button class="small-btn" onclick="budMonth(1)" title="Next month">&#9654;</button>
     </div>
-    <div class="card-b" id="bud-rows"></div>
   </div>
-  <div class="note-line">Spending comes from categorized transactions on the Transactions tab. Groceries target is $0 on purpose: the benefit card covers food, so anything landing there is leakage worth seeing.</div>
+  <div id="bud-rows"></div>
 </div></div>
 
 <!-- MONTH -->
@@ -1379,31 +1390,44 @@ async function budgetLoad(){
   const sums={}; (data||[]).forEach(r=>{ const c=String(r.cat||''); if(!c.startsWith('b:')&&!c.startsWith('g:'))return; const id=c.startsWith('b:')?c.slice(2):c; sums[id]=(sums[id]||0)-(+r.amount||0); });
   TXB.month=budM; TXB.sums=sums; renderBudget();
 }
+// Ring: the share LEFT, drawn green; spent eats it clockwise. Over target = full red ring. No target = faint full ring.
+function ringSVG(spent,tgt,size,width){
+  const r=(size-width)/2, c=2*Math.PI*r;
+  const over=tgt>0&&spent>tgt, none=!(tgt>0);
+  const left=none?1:Math.max(0,Math.min(1,(tgt-spent)/tgt));
+  const frac=over?1:left;
+  return `<svg class="ring ${over?'over':''} ${none?'none':''}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle class="bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${width}"/>
+    <circle class="fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${width}" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c*(1-frac)).toFixed(2)}"/>
+  </svg>`;
+}
 function renderBudget(){
   const[y,m]=budM.split('-').map(Number);
   $('bud-month').textContent=MNAMES[m-1]+' '+y;
   const sp=S.spend[budM]||{}, tx=TXB.month===budM?TXB.sums:{};
-  let totT=0, totS=0;
-  const row=c=>{
-    const spent=(sp[c.id]||[]).reduce((a,b)=>a+b,0)+(tx[String(c.id)]||0);
-    totT+=c.tgt; totS+=spent;
-    const pct=c.tgt>0?Math.min(100,spent/c.tgt*100):(spent>0?100:0);
-    const over=c.tgt>0?spent>c.tgt:spent>0;
-    return `<div class="bud-row">
-      <div class="bud-name">${esc(c.name)}${c.note?`<div class="sub" style="font-weight:400;font-size:11px;color:var(--muted)">${esc(c.note)}</div>`:''}</div>
-      <div class="bud-bar"><div class="bud-fill ${over?'over':''}" style="width:${pct}%"></div></div>
-      <div class="bud-nums">${fmt0(spent)} / ${fmt0(c.tgt)}<div class="left">${c.tgt-spent>=0?fmt0(c.tgt-spent)+' left':fmt0(spent-c.tgt)+' OVER'}</div></div>
-    </div>`;
+  let allT=0, allS=0;
+  const spentOf=c=>(sp[c.id]||[]).reduce((a,b)=>a+b,0)+(tx[String(c.id)]||0);
+  const tile=c=>{
+    const spent=spentOf(c), left=c.tgt-spent, over=c.tgt>0&&spent>c.tgt;
+    const main=c.tgt>0?(over?fmt0(spent-c.tgt)+' over':fmt0(left)+' left'):fmt0(spent)+' spent';
+    const of=c.tgt>0?fmt0(spent)+' of '+fmt0(c.tgt):'no target';
+    return `<div class="bud-tile">${ringSVG(spent,c.tgt,48,7)}<div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="left ${over?'over':''}">${main}</div><div class="of">${of}</div></div></div>`;
   };
-  // Home first, then Taekwondo, each under its own small header (categories carry grp).
+  // Home first, then Taekwondo: one card per side with its own ring, then a ring tile per category.
   $('bud-rows').innerHTML=EXP_GROUPS.slice().reverse().map(([grp,title])=>{
     const cats=budgetCats(grp); if(!cats.length)return '';
-    // "Unsorted" = confirmed to this side by the card it was swiped on, no finer category yet.
-    const uns=tx['g:'+grp]||0, unsRow=uns?row({id:'g:'+grp,name:title+', unsorted',tgt:0,note:'sorted by card only'}):'';
-    return `<div class="cat-grp">${title}</div>`+cats.map(row).join('')+unsRow;
-  }).join('')+`<div class="bud-row" style="border-top:2px solid var(--rule);font-weight:700">
-    <div class="bud-name">Total</div><div class="bud-bar"></div>
-    <div class="bud-nums">${fmt0(totS)} / ${fmt0(totT)}</div></div>`;
+    const gen=tx['g:'+grp]||0; // sorted to this side by the card only, no finer category
+    const list=cats.concat(gen?[{id:'g:'+grp,name:'General',tgt:0}]:[]);
+    const tgt=cats.reduce((s,c)=>s+(+c.tgt||0),0), spent=list.reduce((s,c)=>s+spentOf(c),0), over=spent>tgt;
+    allT+=tgt; allS+=spent;
+    return `<div class="card ${grp==='home'?'ac-green':'ac-red'}">
+      <div class="card-h"><span class="ttl"><span class="icb ac">${ico(grp==='home'?'home':'target')}</span>${title}</span><span class="grp-tot" style="color:${over?'var(--belt)':'var(--money)'}">${over?fmt0(spent-tgt)+' over':fmt0(tgt-spent)+' left'}</span></div>
+      <div class="card-b">
+        <div class="bud-hero">${ringSVG(spent,tgt,84,11)}<div><div class="big" style="color:${over?'var(--belt)':'var(--ink)'}">${fmt0(spent)} spent</div><div class="sub">of ${fmt0(tgt)} this month${over?'':' · '+fmt0(tgt-spent)+' to go'}</div></div></div>
+        <div class="bud-grid">${list.map(tile).join('')}</div>
+      </div></div>`;
+  }).join('')||'<div class="card"><div class="card-b"><div class="empty">No budget categories yet.</div></div></div>';
+  $('bud-sub').textContent=`${fmt0(allS)} spent of ${fmt0(allT)} · variable spending, from the Transactions tab`;
 }
 function spendModal(id){
   const c=S.budget.find(x=>x.id===id);
@@ -1608,7 +1632,7 @@ async function loadTxns(force){
   renderTxns();
 }
 function catOptions(){
-  const o=[['g:school','Taekwondo, unsorted','Taekwondo budget'],['g:home','Home, unsorted','Home budget']];
+  const o=[['g:school','Taekwondo, general','Taekwondo budget'],['g:home','Home, general','Home budget']];
   (S.budget||[]).forEach(c=>o.push(['b:'+c.id,c.name,budGrp(c)==='school'?'Taekwondo budget':'Home budget']));
   ['school','home'].forEach(g=>((S.bills&&S.bills[g])||[]).forEach(b=>o.push(['e:'+g+':'+b.id,b.name,g==='school'?'Taekwondo bills':'Home bills'])));
   o.push(['income','Income','Other'],['transfer','Transfer','Other'],['skip','Skip','Other']);
