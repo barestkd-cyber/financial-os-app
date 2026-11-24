@@ -1056,7 +1056,7 @@ function bucketMoveGo(grp,id,dir){
 function budgetBucketCardHTML(grp){
   const amt=budgetTotal(grp), inB=budBucket(grp), pct=amt>0?Math.max(0,Math.min(100,inB/amt*100)):0;
   return `<div class="fund ${amt>0&&inB>=amt?'full':''}">
-    <div class="top"><span class="dot" style="background:var(--amber)" title="Average"></span><span class="nm">Spending budget${grp==='school'?' (Taekwondo)':' (Home)'}</span>
+    <div class="top"><span class="dot" style="background:var(--amber)" title="Average"></span><span class="nm">Spending budget${grp==='school'?' (Business)':' (Home)'}</span>
       <span class="amt"><b style="color:${inB<0?'var(--belt)':'var(--ink)'}">${fmt0(inB)}</b><span class="of"> / </span><span class="tgt">${fmt0(amt)}</span></span></div>
     <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
     <div class="foot"><div class="next"><span><b>${fmt0(amt*12/52)}</b> Mon</span></div>
@@ -1133,11 +1133,11 @@ function delFundGo(id){S.funds=S.funds.filter(f=>f.id!==id); save(); closeModal(
 const ACCT_TAG={citi:['citi','Citi'],qs:['qs','QS'],chk:['chk-acct','Checking'],venmo:['venmo','Venmo']};
 function mTotal(act,m){const v=act[m]; if(!v)return 0; return Array.isArray(v)?v.reduce((a,b)=>a+b,0):+v;}
 // Expenses page (replaced the month-grid Bills tab, Nov 2026). Same data:
-// S.bills.school[] (Taekwondo) and S.bills.home[], each {id,name,due,cost,hi,acct,pay,act,payAcct}.
+// S.bills.school[] (Business) and S.bills.home[], each {id,name,due,cost,hi,acct,pay,act,payAcct}.
 // act = payment history: 'YYYY-MM' keys (new) or a bare month number (legacy = this year),
 // each an array of payments. Budget = highest of the last 3 months with payments; until
 // there are 3, the hand-entered estimate (hi, else cost) or any higher actual.
-const EXP_GROUPS=[['school','Taekwondo'],['home','Home']];
+const EXP_GROUPS=[['school','Business'],['home','Home']];
 const ymOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 const ymNow=()=>ymOf(new Date());
 function keyYm(k){ return /^\d{4}-\d{2}$/.test(k)?k:new Date().getFullYear()+'-'+String(+k).padStart(2,'0'); }
@@ -1454,7 +1454,7 @@ function renderBudget(){
     const lines=real?`<div class="of">Funded ${fmt0(fd)} of ${fmt0(c.tgt)}</div><div class="of">Spent ${fmt0(spent)}${unf>0.5?` · <span class="unf">${fmt0(unf)} before funding</span>`:''}</div>`:'<div class="of">no target</div>';
     return `<div class="bud-tile ${real?'tap':''}" ${real?`onclick="budFundModal('${c.id}')"`:''}>${real?ringSVG(spent,c.tgt,52,7,fd):ringSVG(spent,0,52,7)}<div><div class="nm" title="${esc(c.name)}">${esc(c.name)}</div><div class="left ${st}">${main}</div>${lines}</div></div>`;
   };
-  // Home first, then Taekwondo: one card per side with its own rings, then a two-ring tile per category.
+  // Home first, then Business: one card per side with its own rings, then a two-ring tile per category.
   $('bud-rows').innerHTML=EXP_GROUPS.slice().reverse().map(([grp,title])=>{
     const cats=budgetCats(grp); if(!cats.length)return '';
     const gen=tx['g:'+grp]||0; // sorted to this side by the card only, no finer category
@@ -1621,7 +1621,7 @@ async function bankSync(manual){
 // side (accounts[].side = 'school' | 'home', home when unset); a new row is never categorized on
 // insert. Its chip shows a suggestion (txSuggest: the payee rule if one exists, else income for a
 // deposit, else the card's side as a coarse 'g:<side>' category) until Race taps it, or "Confirm all
-// suggested". 'g:school' / 'g:home' are real categories ("Taekwondo, unsorted" / "Home, unsorted")
+// suggested". 'g:school' / 'g:home' are real categories ("Business, unsorted" / "Home, unsorted")
 // that the Budget tab counts, so a swipe on the right card sorts itself with one tap.
 // payee = normalized merchant key: lowercase, bank boilerplate and numbers stripped, first three
 // words. Category rules (S.txnRules[payee] = cat) only suggest; they never set a category.
@@ -1674,9 +1674,9 @@ async function loadTxns(force){
   renderTxns();
 }
 function catOptions(){
-  const o=[['g:school','Taekwondo, general','Taekwondo budget'],['g:home','Home, general','Home budget']];
-  (S.budget||[]).forEach(c=>o.push(['b:'+c.id,c.name,budGrp(c)==='school'?'Taekwondo budget':'Home budget']));
-  ['school','home'].forEach(g=>((S.bills&&S.bills[g])||[]).forEach(b=>o.push(['e:'+g+':'+b.id,b.name,g==='school'?'Taekwondo bills':'Home bills'])));
+  const o=[['g:school','Business, general','Business budget'],['g:home','Home, general','Home budget']];
+  (S.budget||[]).forEach(c=>o.push(['b:'+c.id,c.name,budGrp(c)==='school'?'Business budget':'Home budget']));
+  ['school','home'].forEach(g=>((S.bills&&S.bills[g])||[]).forEach(b=>o.push(['e:'+g+':'+b.id,b.name,g==='school'?'Business bills':'Home bills'])));
   o.push(['income','Income','Other'],['transfer','Transfer','Other'],['skip','Skip','Other']);
   return o;
 }
@@ -1725,7 +1725,7 @@ function catPick(i){
   const sug=t.cat||txSuggest(t), side=acctSide(acctRec().find(x=>x.id===t.acct_id));
   const groups={}; catOptions().forEach(o=>{ (groups[o[2]]=groups[o[2]]||[]).push(o); });
   // The swiped card's side comes first, the other side below it, then Income / Transfer / Skip.
-  const order=side==='school'?['Taekwondo budget','Taekwondo bills','Home budget','Home bills','Other']:['Home budget','Home bills','Taekwondo budget','Taekwondo bills','Other'];
+  const order=side==='school'?['Business budget','Business bills','Home budget','Home bills','Other']:['Home budget','Home bills','Business budget','Business bills','Other'];
   openModal(`<h3>${esc(t.descr)||'(no description)'}</h3>
     <div class="note-line" style="margin:0 0 6px">${txAmt(t.amount)} · ${esc(txAcctName(t))} · ${new Date(t.posted*1000).toLocaleDateString()}</div>
     ${t.cat?'':`<div class="row" style="margin:0 0 8px"><button class="go" onclick="catSet(${i},'${sug}')">Confirm: ${esc(catLabel(sug))}</button></div>`}
